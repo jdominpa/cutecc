@@ -7,12 +7,13 @@
 
 static const char *token_kind_name(TokenKind kind)
 {
-    assert(TK_COUNT == 49 && "TokenKind count has changed");
+    assert(TK_COUNT == 50 && "TokenKind count has changed");
     const char *kind_names[] = {
         [TK_INVALID] = "TK_INVALID",
         [TK_EOF] = "TK_EOF",
         [TK_IDENT] = "TK_IDENT",
         [TK_NUM] = "TK_NUM",
+        [TK_STR] = "TK_STR",
         [TK_OPAREN] = "TK_OPAREN",
         [TK_CPAREN] = "TK_CPAREN",
         [TK_OBRACE] = "TK_OBRACE",
@@ -92,7 +93,7 @@ int main(int argc, char **argv)
     Lexer l = lexer_init(file_path, content, strlen(content));
     Token t = lexer_next_token(&l);
     while (t.kind != TK_EOF) {
-        fprintf(stderr, "%s: %.*s\n", token_kind_name(t.kind), (int) t.len, t.pos);
+        fprintf(stderr, "%s: %.*s\n", token_kind_name(t.kind), (int) t.len, t.start);
         t = lexer_next_token(&l);
     }
 

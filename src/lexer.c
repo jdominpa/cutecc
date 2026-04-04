@@ -148,14 +148,14 @@ Token lexer_next_token(Lexer *l)
     // EOF
     if (l->pos >= l->size) {
         t.kind = TK_EOF;
-        t.pos = l->source + l->size;
+        t.start = l->source + l->size;
         return t;
     }
 
     // Identifier
     if (lexer_is_ident_start(l->source[l->pos])) {
         t.kind = TK_IDENT;
-        t.pos = l->source + l->pos;
+        t.start = l->source + l->pos;
         while (l->pos < l->size && lexer_is_ident_cont(l->source[l->pos])) {
             t.len++;
             lexer_bump(l);
@@ -166,7 +166,7 @@ Token lexer_next_token(Lexer *l)
     // Number
     if (isdigit(l->source[l->pos])) {
         t.kind = TK_NUM;
-        t.pos = l->source + l->pos;
+        t.start = l->source + l->pos;
         // TODO: handle non-integer numbers
         while (l->pos < l->size && isdigit(l->source[l->pos])) {
             t.len++;
@@ -175,20 +175,39 @@ Token lexer_next_token(Lexer *l)
         return t;
     }
 
+    // String
+    if (l->source[l->pos] == '"') {
+        t.kind = TK_STR;
+        t.start = l->source + l->pos;
+        lexer_bump(l);
+        while (l->pos < l->size && l->source[l->pos] != '"') {
+            if (l->source[l->pos] == '\n' || l->source[l->pos] == '\0')
+                lexer_report_at(ERROR, t.loc, "unclosed string literal");
+            if (l->source[l->pos] == '\\')
+                lexer_bump(l);
+            lexer_bump(l);
+        }
+        if (l->pos >= l->size)
+            lexer_report_at(ERROR, t.loc, "unclosed string literal");
+        lexer_bump(l);
+        t.len = l->pos - (t.start - l->source);
+        return t;
+    }
+
 #define MAKE_TOKEN(k, length)          \
     do {                               \
         t.kind = (k);                  \
-        t.pos = l->source + l->pos;    \
+        t.start = l->source + l->pos;  \
         t.len = (length);              \
         lexer_bump_bytes(l, (length)); \
         return t;                      \
     } while (0)
 
-    char cur = l->source[l->pos];
+    char c = l->source[l->pos];
     char first = lexer_peek_first(l);
     char second = lexer_peek_second(l);
 
-    switch (cur) {
+    switch (c) {
     case '(':
         MAKE_TOKEN(TK_OPAREN, 1);
         break;
@@ -321,7 +340,7 @@ Token lexer_next_token(Lexer *l)
 
 #undef MAKE_TOKEN
 
-    t.pos = l->source + l->pos;
+    t.start = l->source + l->pos;
     t.len = 1;
     lexer_bump(l);
     return t;

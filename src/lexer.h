@@ -14,6 +14,7 @@ typedef enum {
     // Literals
     TK_IDENT,                   // identifier
     TK_NUM,                     // number
+    TK_STR,                     // string
 
     // Punctuators
     TK_OPAREN,                  // (
@@ -82,7 +83,7 @@ typedef enum {
 
 typedef struct {
     TokenKind kind;
-    const char *pos;
+    const char *start;
     size_t len;
     Loc loc;
 } Token;
