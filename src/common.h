@@ -1,6 +1,6 @@
 #include <stdlib.h>
 
-#define UNUSED(value) (void) (value)
+#define UNUSED(x) (void)(x)
 #define UNREACHABLE(message)                                            \
     do {                                                                \
         fprintf(stderr, "%s:%d: UNREACHABLE: %s\n", __FILE__, __LINE__, \

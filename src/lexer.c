@@ -27,7 +27,7 @@ void lexer_report_at(ReportLevel level, Loc loc, const char *fmt, ...)
     va_list args;
     va_start(args, fmt);
 
-    fprintf(stderr, "%s:%zu:%zu: ", loc.file_path, loc.row, loc.col);
+    fprintf(stderr, "%s:%zu:%zu: ", loc.file_path, loc.line, loc.col);
     switch (level) {
     case INFO:
         fprintf(stderr, "info: ");
@@ -49,50 +49,63 @@ void lexer_report_at(ReportLevel level, Loc loc, const char *fmt, ...)
         exit(1);
 }
 
-Lexer lexer_init(const char *file_path, const char *content, size_t size)
+Lexer lexer_init(const char *file_path, const char *source, size_t size)
 {
     return (Lexer) {
         .file_path = file_path,
-        .content = content,
+        .source = source,
         .size = size,
     };
 }
 
-static Loc lexer_loc(Lexer *l)
+static Loc lexer_get_loc(Lexer *l)
 {
     return (Loc) {
         .file_path = l->file_path,
-        .row = l->row + 1,
-        .col = l->cur - l->bol + 1,
+        .line = l->line + 1,
+        .col = l->pos - l->bol + 1,
     };
 }
 
-static bool lexer_advance_char(Lexer *l)
+static bool lexer_bump(Lexer *l)
 {
-    if (l->cur >= l->size)
+    if (l->pos >= l->size)
         return false;
-    if (l->content[l->cur++] == '\n') {
-        l->bol = l->cur;
-        l->row++;
+    if (l->source[l->pos++] == '\n') {
+        l->bol = l->pos;
+        l->line++;
     }
     return true;
 }
 
-static bool lexer_advance_chars(Lexer *l, size_t n)
+static bool lexer_bump_bytes(Lexer *l, size_t n)
 {
     while (n--)
-        if (!lexer_advance_char(l))
+        if (!lexer_bump(l))
             return false;
     return true;
 }
 
+static char lexer_peek_first(Lexer *l)
+{
+    if (l->pos + 1 >= l->size)
+        return '\0';
+    return l->source[l->pos + 1];
+}
+
+static char lexer_peek_second(Lexer *l)
+{
+    if (l->pos + 2 >= l->size)
+        return '\0';
+    return l->source[l->pos + 2];
+}
+
 static bool lexer_starts_with(Lexer *l, const char *prefix)
 {
-    assert(l->cur < l->size && "lexer cursor out of bounds");
     size_t len = strlen(prefix);
-    if (l->cur + len <= l->size) {
+    if (l->pos + len <= l->size) {
         for (size_t i = 0; i < len; ++i)
-            if (l->content[l->cur + i] != prefix[i])
+            if (l->source[l->pos + i] != prefix[i])
                 return false;
         return true;
     }
@@ -115,33 +128,39 @@ Token lexer_next_token(Lexer *l)
 
     // Skip whitespace and comments
     for (;;) {
-        while (l->cur < l->size && isspace(l->content[l->cur]))
-            lexer_advance_char(l);
-        if (l->cur < l->size && lexer_starts_with(l, "//")) {
-            while (l->cur < l->size && l->content[l->cur] != '\r' &&
-                   l->content[l->cur] != '\n')
-                lexer_advance_char(l);
-            continue;
-        }
-        if (l->cur < l->size && lexer_starts_with(l, "/*")) {
-            Loc comment_beg = lexer_loc(l);
-            lexer_advance_chars(l, 2);
-            while (l->cur < l->size && !lexer_starts_with(l, "*/"))
-                lexer_advance_char(l);
-            if (l->cur >= l->size)
-                lexer_report_at(ERROR, comment_beg, "unclosed comment block");
-            lexer_advance_chars(l, 2);
-            continue;
+        while (l->pos < l->size && isspace(l->source[l->pos]))
+            lexer_bump(l);
+        if (l->pos < l->size && l->source[l->pos] == '/') {
+            switch (lexer_peek_first(l)) {
+            case '/':
+                lexer_bump_bytes(l, 2);
+                while (l->pos < l->size && l->source[l->pos] != '\r' &&
+                       l->source[l->pos] != '\n')
+                    lexer_bump(l);
+                continue;
+            case '*':
+                Loc comment_beg = lexer_get_loc(l);
+                lexer_bump_bytes(l, 2);
+                while (l->pos < l->size && !lexer_starts_with(l, "*/"))
+                    lexer_bump(l);
+                if (l->pos >= l->size)
+                    lexer_report_at(ERROR, comment_beg,
+                                    "unclosed comment block");
+                lexer_bump_bytes(l, 2);
+                continue;
+            default:
+                break;
+            }
         }
         break;
     }
 
-    t.loc = lexer_loc(l);
+    t.loc = lexer_get_loc(l);
 
     // EOF
-    if (l->cur >= l->size) {
+    if (l->pos >= l->size) {
         t.kind = TK_EOF;
-        t.pos = l->content + l->size;
+        t.pos = l->source + l->size;
         return t;
     }
 
@@ -157,30 +176,30 @@ Token lexer_next_token(Lexer *l)
     }
 
     // Identifier
-    if (lexer_is_ident_start(l->content[l->cur])) {
+    if (lexer_is_ident_start(l->source[l->pos])) {
         t.kind = TK_IDENT;
-        t.pos = l->content + l->cur;
-        while (l->cur < l->size && lexer_is_ident_cont(l->content[l->cur])) {
+        t.pos = l->source + l->pos;
+        while (l->pos < l->size && lexer_is_ident_cont(l->source[l->pos])) {
             t.len++;
-            lexer_advance_char(l);
+            lexer_bump(l);
         }
         return t;
     }
 
     // Number
-    if (isdigit(l->content[l->cur])) {
+    if (isdigit(l->source[l->pos])) {
         t.kind = TK_NUM;
-        t.pos = l->content + l->cur;
+        t.pos = l->source + l->pos;
         // TODO: handle non-integer numbers
-        while (l->cur < l->size && isdigit(l->content[l->cur])) {
+        while (l->pos < l->size && isdigit(l->source[l->pos])) {
             t.len++;
-            lexer_advance_char(l);
+            lexer_bump(l);
         }
         return t;
     }
 
     t.pos = l->content + l->cur;
     t.len = 1;
-    lexer_advance_char(l);
+    lexer_bump(l);
     return t;
 }

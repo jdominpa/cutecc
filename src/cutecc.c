@@ -5,6 +5,32 @@
 #include "common.h"
 #include "lexer.h"
 
+static const char *token_kind_name(TokenKind kind)
+{
+    assert(TK_COUNT == 18 && "TokenKind count has changed");
+    const char *kind_names[] = {
+        [TK_INVALID] = "TK_INVALID",
+        [TK_EOF] = "TK_EOF",
+        [TK_LPAREN] = "TK_OPAREN",
+        [TK_CPAREN] = "TK_CPAREN",
+        [TK_OBRACE] = "TK_OBRACE",
+        [TK_CBRACE] = "TK_CBRACE",
+        [TK_SEMICOLON] = "TK_SEMICOLON",
+        [TK_DOT] = "TK_DOT",
+        [TK_PLUS] = "TK_PLUS",
+        [TK_PLUS_EQ] = "TK_PLUS_EQ",
+        [TK_MINUS] = "TK_MINUS",
+        [TK_MINUS_EQ] = "TK_MINUS_EQ",
+        [TK_AST] = "TK_AST",
+        [TK_AST_EQ] = "TK_AST_EQ",
+        [TK_SLASH] = "TK_SLASH",
+        [TK_SLASH_EQ] = "TK_SLASH_EQ",
+        [TK_IDENT] = "TK_IDENT",
+        [TK_NUM] = "TK_NUM",
+    };
+    return kind_names[kind];
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -27,47 +53,14 @@ int main(int argc, char **argv)
         fprintf(stderr, "%s: error: out of memory\n", argv[0]);
         return 1;
     }
-    fread(content, 1, size, f);
+    UNUSED(fread(content, 1, size, f));
     fclose(f);
     content[size] = '\0';
 
     Lexer l = lexer_init(file_path, content, strlen(content));
     Token t = lexer_next_token(&l);
     while (t.kind != TK_EOF) {
-        static_assert(TK_COUNT == 9, "TokenKind count has changed");
-        switch (t.kind) {
-        case TK_INVALID:
-            fprintf(stderr, "TK_INVALID: ");
-            break;
-        case TK_OPAREN:
-            fprintf(stderr, "TK_OPAREN: ");
-            break;
-        case TK_CPAREN:
-            fprintf(stderr, "TK_CPAREN: ");
-            break;
-        case TK_OBRACE:
-            fprintf(stderr, "TK_OBRACE: ");
-            break;
-        case TK_CBRACE:
-            fprintf(stderr, "TK_CBRACE: ");
-            break;
-        case TK_SEMICOLON:
-            fprintf(stderr, "TK_SEMICOLON: ");
-            break;
-        case TK_IDENT:
-            fprintf(stderr, "TK_IDENT: ");
-            break;
-        case TK_NUM:
-            fprintf(stderr, "TK_NUM: ");
-            break;
-        case TK_EOF:
-            UNREACHABLE("main");
-            break;
-        default:
-            UNREACHABLE("main");
-            break;
-        }
-        fprintf(stderr, "%.*s\n", (int) t.len, t.pos);
+        fprintf(stderr, "%s: %.*s\n", token_kind_name(t.kind), (int) t.len, t.pos);
         t = lexer_next_token(&l);
     }
 
