@@ -10,18 +10,6 @@
 
 #include "common.h"
 
-typedef struct {
-    TokenKind kind;
-    const char *text;
-} Punct;
-
-Punct puncts[] = {
-    { .kind = TK_OPAREN, .text = "(" },    { .kind = TK_CPAREN, .text = ")" },
-    { .kind = TK_OBRACE, .text = "{" },    { .kind = TK_CBRACE, .text = "}" },
-    { .kind = TK_SEMICOLON, .text = ";" },
-};
-#define PUNCT_COUNT sizeof(puncts) / sizeof(puncts[0])
-
 void lexer_report_at(ReportLevel level, Loc loc, const char *fmt, ...)
 {
     va_list args;
@@ -164,17 +152,6 @@ Token lexer_next_token(Lexer *l)
         return t;
     }
 
-    // Punctuators
-    for (size_t i = 0; i < PUNCT_COUNT; ++i) {
-        if (lexer_starts_with(l, puncts[i].text)) {
-            t.kind = puncts[i].kind;
-            t.pos = l->content + l->cur;
-            t.len = strlen(puncts[i].text);
-            lexer_advance_chars(l, t.len);
-            return t;
-        }
-    }
-
     // Identifier
     if (lexer_is_ident_start(l->source[l->pos])) {
         t.kind = TK_IDENT;
@@ -198,7 +175,153 @@ Token lexer_next_token(Lexer *l)
         return t;
     }
 
-    t.pos = l->content + l->cur;
+#define MAKE_TOKEN(k, length)          \
+    do {                               \
+        t.kind = (k);                  \
+        t.pos = l->source + l->pos;    \
+        t.len = (length);              \
+        lexer_bump_bytes(l, (length)); \
+        return t;                      \
+    } while (0)
+
+    char cur = l->source[l->pos];
+    char first = lexer_peek_first(l);
+    char second = lexer_peek_second(l);
+
+    switch (cur) {
+    case '(':
+        MAKE_TOKEN(TK_OPAREN, 1);
+        break;
+    case ')':
+        MAKE_TOKEN(TK_CPAREN, 1);
+        break;
+    case '{':
+        MAKE_TOKEN(TK_OBRACE, 1);
+        break;
+    case '}':
+        MAKE_TOKEN(TK_CBRACE, 1);
+        break;
+    case '[':
+        MAKE_TOKEN(TK_OBRACK, 1);
+        break;
+    case ']':
+        MAKE_TOKEN(TK_CBRACK, 1);
+        break;
+    case ';':
+        MAKE_TOKEN(TK_SEMI, 1);
+        break;
+    case ':':
+        MAKE_TOKEN(TK_COLON, 1);
+        break;
+    case '.':
+        MAKE_TOKEN(TK_DOT, 1);
+        break;
+    case ',':
+        MAKE_TOKEN(TK_COMMA, 1);
+        break;
+    case '?':
+        MAKE_TOKEN(TK_QUESTION, 1);
+        break;
+    case '+':
+        if (first == '=')
+            MAKE_TOKEN(TK_PLUS_EQ, 2);
+        else if (first == '+')
+            MAKE_TOKEN(TK_PLUS_PLUS, 2);
+        else
+            MAKE_TOKEN(TK_PLUS, 1);
+        break;
+    case '-':
+        if (first == '=')
+            MAKE_TOKEN(TK_MINUS_EQ, 2);
+        else if (first == '-')
+            MAKE_TOKEN(TK_MINUS_MINUS, 2);
+        else if (first == '>')
+            MAKE_TOKEN(TK_MINUS_GT, 2);
+        else
+            MAKE_TOKEN(TK_MINUS, 1);
+        break;
+    case '*':
+        if (first == '=')
+            MAKE_TOKEN(TK_STAR_EQ, 2);
+        else
+            MAKE_TOKEN(TK_STAR, 1);
+        break;
+    case '/':
+        if (first == '=')
+            MAKE_TOKEN(TK_SLASH_EQ, 2);
+        else
+            MAKE_TOKEN(TK_SLASH, 1);
+        break;
+    case '%':
+        if (first == '=')
+            MAKE_TOKEN(TK_PERCENT_EQ, 2);
+        else
+            MAKE_TOKEN(TK_PERCENT, 1);
+        break;
+    case '~':
+        MAKE_TOKEN(TK_TILDE, 1);
+        break;
+    case '&':
+        if (first == '=')
+            MAKE_TOKEN(TK_AMP_EQ, 2);
+        else if (first == '&')
+            MAKE_TOKEN(TK_AMP_AMP, 2);
+        else
+            MAKE_TOKEN(TK_AMP, 1);
+        break;
+    case '|':
+        if (first == '=')
+            MAKE_TOKEN(TK_PIPE_EQ, 2);
+        else if (first == '|')
+            MAKE_TOKEN(TK_PIPE_PIPE, 2);
+        else
+            MAKE_TOKEN(TK_PIPE, 1);
+        break;
+    case '^':
+        if (first == '=')
+            MAKE_TOKEN(TK_CARET_EQ, 2);
+        else
+            MAKE_TOKEN(TK_CARET, 1);
+        break;
+    case '!':
+        if (first == '=')
+            MAKE_TOKEN(TK_BANG_EQ, 2);
+        else
+            MAKE_TOKEN(TK_BANG, 1);
+        break;
+    case '=':
+        if (first == '=')
+            MAKE_TOKEN(TK_EQ_EQ, 2);
+        else
+            MAKE_TOKEN(TK_EQ, 1);
+        break;
+    case '<':
+        if (first == '<')
+            if (second == '=')
+                MAKE_TOKEN(TK_LT_LT_EQ, 3);
+            else
+                MAKE_TOKEN(TK_LT_LT, 2);
+        else if (first == '=')
+            MAKE_TOKEN(TK_LT_EQ, 2);
+        else
+            MAKE_TOKEN(TK_LT, 1);
+        break;
+    case '>':
+        if (first == '>')
+            if (second == '=')
+                MAKE_TOKEN(TK_GT_GT_EQ, 3);
+            else
+                MAKE_TOKEN(TK_GT_GT, 2);
+        else if (first == '=')
+            MAKE_TOKEN(TK_GT_EQ, 2);
+        else
+            MAKE_TOKEN(TK_GT, 1);
+        break;
+    }
+
+#undef MAKE_TOKEN
+
+    t.pos = l->source + l->pos;
     t.len = 1;
     lexer_bump(l);
     return t;
