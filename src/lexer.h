@@ -1,11 +1,10 @@
+#ifndef LEXER_H_
+#define LEXER_H_
+
 #include <stdbool.h>
 #include <stddef.h>
 
-typedef struct {
-    const char *file_path;
-    size_t line;
-    size_t col;
-} Loc;
+#include "diag.h"
 
 typedef enum {
     TK_INVALID,                 // invalid token
@@ -97,12 +96,7 @@ typedef struct {
     size_t line;                // current line number
 } Lexer;
 
-typedef enum {
-    INFO,
-    WARNING,
-    ERROR,
-} ReportLevel;
-
-void lexer_report_at(ReportLevel level, Loc loc, const char *fmt, ...);
-Lexer lexer_init(const char *file_path, const char *content, size_t size);
+Lexer lexer_init(const char *file_path, const char *source, size_t size);
 Token lexer_next_token(Lexer *l);
+
+#endif  // LEXER_H_

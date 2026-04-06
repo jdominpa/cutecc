@@ -1,41 +1,7 @@
 #include "lexer.h"
 
-#include <assert.h>
 #include <ctype.h>
-#include <stdarg.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-
-#include "common.h"
-
-void lexer_report_at(ReportLevel level, Loc loc, const char *fmt, ...)
-{
-    va_list args;
-    va_start(args, fmt);
-
-    fprintf(stderr, "%s:%zu:%zu: ", loc.file_path, loc.line, loc.col);
-    switch (level) {
-    case INFO:
-        fprintf(stderr, "info: ");
-        break;
-    case WARNING:
-        fprintf(stderr, "warning: ");
-        break;
-    case ERROR:
-        fprintf(stderr, "error: ");
-        break;
-    default:
-        UNREACHABLE("lexer_report_at");
-    }
-    vfprintf(stderr, fmt, args);
-    fprintf(stderr, "\n");
-
-    va_end(args);
-    if (level == ERROR)
-        exit(1);
-}
 
 Lexer lexer_init(const char *file_path, const char *source, size_t size)
 {
@@ -132,8 +98,8 @@ Token lexer_next_token(Lexer *l)
                 while (l->pos < l->size && !lexer_starts_with(l, "*/"))
                     lexer_bump(l);
                 if (l->pos >= l->size)
-                    lexer_report_at(ERROR, comment_beg,
-                                    "unclosed comment block");
+                    diag_report_at(ERROR, comment_beg,
+                                   "unclosed comment block");
                 lexer_bump_bytes(l, 2);
                 continue;
             default:
@@ -182,13 +148,13 @@ Token lexer_next_token(Lexer *l)
         lexer_bump(l);
         while (l->pos < l->size && l->source[l->pos] != '"') {
             if (l->source[l->pos] == '\n' || l->source[l->pos] == '\0')
-                lexer_report_at(ERROR, t.loc, "unclosed string literal");
+                diag_report_at(ERROR, t.loc, "unclosed string literal");
             if (l->source[l->pos] == '\\')
                 lexer_bump(l);
             lexer_bump(l);
         }
         if (l->pos >= l->size)
-            lexer_report_at(ERROR, t.loc, "unclosed string literal");
+            diag_report_at(ERROR, t.loc, "unclosed string literal");
         lexer_bump(l);
         t.len = l->pos - (t.start - l->source);
         return t;
