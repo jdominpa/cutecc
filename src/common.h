@@ -1,6 +1,9 @@
+#ifndef COMMON_H_
+#define COMMON_H_
+
 #include <stdlib.h>
 
-#define UNUSED(x) (void)(x)
+#define UNUSED(x) (void) (x)
 #define UNREACHABLE(message)                                            \
     do {                                                                \
         fprintf(stderr, "%s:%d: UNREACHABLE: %s\n", __FILE__, __LINE__, \
@@ -12,3 +15,5 @@
         fprintf(stderr, "%s:%d: TODO: %s\n", __FILE__, __LINE__, message); \
         abort();                                                           \
     } while (0)
+
+#endif  // COMMON_H_
