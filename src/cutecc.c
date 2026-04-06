@@ -81,22 +81,26 @@ int main(int argc, char **argv)
     fseek(f, 0, SEEK_END);
     size_t size = ftell(f);
     fseek(f, 0, SEEK_SET);
-    char *content = malloc(size + 1);
-    if (content == NULL) {
+    char *source = malloc(size + 1);
+    if (source == NULL) {
         fprintf(stderr, "%s: error: out of memory\n", argv[0]);
         return 1;
     }
-    UNUSED(fread(content, 1, size, f));
+    size_t size_read = fread(source, 1, size, f);
+    if (size_read != size) {
+        fprintf(stderr, "%s: error: expected %zu bytes from '%s' but got %zu\n", argv[0], size, file_path, size_read);
+        return 1;
+    }
     fclose(f);
-    content[size] = '\0';
+    source[size] = '\0';
 
-    Lexer l = lexer_init(file_path, content, strlen(content));
+    Lexer l = lexer_init(file_path, source, strlen(source));
     Token t = lexer_next_token(&l);
     while (t.kind != TK_EOF) {
         fprintf(stderr, "%s: %.*s\n", token_kind_name(t.kind), (int) t.len, t.start);
         t = lexer_next_token(&l);
     }
 
-    free(content);
+    free(source);
     return 0;
 }
