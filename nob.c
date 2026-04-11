@@ -13,6 +13,7 @@ int main(int argc, char **argv)
     if (!nob_mkdir_if_not_exists(BUILD_DIR)) return 1;
     Nob_Cmd cmd = { 0 };
     const char *src_files[] = {
+        "arena",
         "cutecc",
         "diag",
         "lexer",
