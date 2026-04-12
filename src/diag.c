@@ -28,7 +28,4 @@ void diag_report(DiagLevel level, Loc loc, const char *fmt, ...)
     fprintf(stderr, "\n");
 
     va_end(args);
-    // TODO: don't panic when we encounter an error
-    if (level == DIAG_ERROR)
-        exit(1);
 }
