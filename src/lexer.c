@@ -80,16 +80,12 @@ static bool lexer_bump_bytes(Lexer *l, size_t n)
 
 static char lexer_peek_first(Lexer *l)
 {
-    if (l->pos + 1 >= l->size)
-        return '\0';
-    return l->source[l->pos + 1];
+    return l->pos + 1 < l->size ? l->source[l->pos + 1] : '\0';
 }
 
 static char lexer_peek_second(Lexer *l)
 {
-    if (l->pos + 2 >= l->size)
-        return '\0';
-    return l->source[l->pos + 2];
+    return l->pos + 2 < l->size ? l->source[l->pos + 2] : '\0';
 }
 
 static bool lexer_starts_with(Lexer *l, const char *prefix)
