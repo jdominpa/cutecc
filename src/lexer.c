@@ -1,15 +1,44 @@
 #include "lexer.h"
 
 #include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
-Lexer lexer_init(const char *file_path, const char *source, size_t size)
+Lexer lexer_init_from_source(const char *file_path, const char *source)
 {
     return (Lexer) {
         .file_path = file_path,
         .source = source,
-        .size = size,
+        .size = strlen(source),
     };
+}
+
+Lexer lexer_init_from_file_path(const char *file_path)
+{
+    /* Read file */
+    FILE *f = fopen(file_path, "rb");
+    if (f == NULL) {
+        fprintf(stderr, "%s: ERROR: could not open file '%s' for parsing\n", file_path, file_path);
+        exit(1);
+    }
+    fseek(f, 0, SEEK_END);
+    size_t size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    char *source = malloc(size + 1);
+    if (source == NULL) {
+        fprintf(stderr, "%s: ERROR: could not allocate memory to read file '%s'\n", file_path, file_path);
+        exit(1);
+    }
+    size_t size_read = fread(source, 1, size, f);
+    if (size_read != size) {
+        fprintf(stderr, "%s: ERROR: expected %zu bytes when reading '%s' but got %zu\n", file_path, size, file_path, size_read);
+        exit(1);
+    }
+    fclose(f);
+    source[size] = '\0';
+
+    return lexer_init_from_source(file_path, source);
 }
 
 static Loc lexer_get_loc(Lexer *l)
