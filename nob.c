@@ -17,6 +17,7 @@ int main(int argc, char **argv)
         "cutecc",
         "diag",
         "lexer",
+        "parser",
     };
 
     nob_cmd_append(&cmd, "cc", CFLAGS);

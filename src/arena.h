@@ -1,6 +1,7 @@
 #ifndef ARENA_H_
 #define ARENA_H_
 
+#include <stdint.h>
 #include <stdlib.h>
 
 typedef struct Chunk Chunk;
@@ -30,8 +31,8 @@ void arena_free(Arena *a);
 
 typedef struct {
     size_t chunk_count;
-    size_t total_size;       /* sum of all chunk sizes */
-    size_t total_offset;     /* sum of all chunk offsets */
+    size_t total_size;   /* sum of all chunk sizes */
+    size_t total_offset; /* sum of all chunk offsets */
 } ArenaStats;
 
 ArenaStats arena_stats(const Arena *a);

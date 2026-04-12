@@ -1,9 +1,8 @@
 #include <assert.h>
 #include <stdio.h>
-#include <string.h>
+#include <stdlib.h>
 
-#include "common.h"
-#include "lexer.h"
+#include "parser.h"
 
 static const char *token_kind_name(TokenKind kind)
 {
@@ -71,36 +70,12 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    const char *file_path = argv[1];
-    FILE *f = fopen(file_path, "rb");
-    if (f == NULL) {
-        fprintf(stderr, "%s: error: could not open file '%s'", argv[0],
-                file_path);
-        return 1;
-    }
-    fseek(f, 0, SEEK_END);
-    size_t size = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    char *source = malloc(size + 1);
-    if (source == NULL) {
-        fprintf(stderr, "%s: error: out of memory\n", argv[0]);
-        return 1;
-    }
-    size_t size_read = fread(source, 1, size, f);
-    if (size_read != size) {
-        fprintf(stderr, "%s: error: expected %zu bytes from '%s' but got %zu\n", argv[0], size, file_path, size_read);
-        return 1;
-    }
-    fclose(f);
-    source[size] = '\0';
-
-    Lexer l = lexer_init(file_path, source, strlen(source));
-    Token t = lexer_next_token(&l);
-    while (t.kind != TK_EOF) {
-        fprintf(stderr, "%s: %.*s\n", token_kind_name(t.kind), (int) t.len, t.start);
-        t = lexer_next_token(&l);
+    Parser p = parser_init(argv[1]);
+    for (size_t i = 0; i < p.token_count; ++i) {
+        Token t = p.tokens[i];
+        printf("%s:%zu:%zu: %s: %.*s\n", t.loc.file_path, t.loc.line, t.loc.col,
+               token_kind_name(t.kind), (int) t.len, t.start);
     }
 
-    free(source);
     return 0;
 }
