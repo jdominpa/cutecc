@@ -10,11 +10,11 @@ typedef struct {
 } Loc;
 
 typedef enum {
-    INFO,
-    WARNING,
-    ERROR,
-} ReportLevel;
+    DIAG_INFO,
+    DIAG_WARNING,
+    DIAG_ERROR,
+} DiagLevel;
 
-void diag_report_at(ReportLevel level, Loc loc, const char *fmt, ...);
+void diag_report(DiagLevel level, Loc loc, const char *fmt, ...);
 
 #endif  // DIAG_H_
