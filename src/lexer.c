@@ -110,6 +110,26 @@ static bool lexer_is_ident_cont(char c)
     return isalnum(c) || c == '_';
 }
 
+static bool lexer_is_keyword(const char *symbol)
+{
+    const char *keywords[] = {
+        "alignas", "alignof", "auto", "bool", "break", "case", "char",
+        "const", "constexpr", "continue", "default", "do", "double", "else",
+        "enum", "extern", "false", "float", "for", "goto", "if",
+        "inline", "int", "long", "nullptr", "register", "restrict", "return",
+        "short", "signed", "sizeof", "static", "static_assert", "struct", "switch",
+        "thread_local", "true", "typedef", "typeof", "typeof_unqual", "union", "unsigned",
+        "void", "volatile", "while", "_Alignas", "_Alignof", "_Atomic",
+        "_BitInt", "_Bool", "_Complex", "_Decimal128", "_Decimal32", "_Decimal64",
+        "_Generic", "_Imaginary", "_Noreturn", "_Static_assert", "_Thread_local",
+    };
+    size_t keyword_count = sizeof(keywords) / sizeof(*keywords);
+    for (size_t i = 0; i < keyword_count; ++i)
+        if (strncmp(symbol, keywords[i], strlen(keywords[i])) == 0)
+            return true;
+    return false;
+}
+
 Token lexer_next_token(Lexer *l)
 {
     Token t = { 0 };
@@ -154,7 +174,7 @@ Token lexer_next_token(Lexer *l)
         return t;
     }
 
-    // Identifier
+    // Identifier/Keyword
     if (lexer_is_ident_start(l->source[l->pos])) {
         t.kind = TK_IDENT;
         t.start = l->source + l->pos;
@@ -162,6 +182,8 @@ Token lexer_next_token(Lexer *l)
             t.len++;
             lexer_bump(l);
         }
+        if (lexer_is_keyword(t.start))
+            t.kind = TK_KW;
         return t;
     }
 
