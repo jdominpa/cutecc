@@ -78,12 +78,12 @@ static bool lexer_bump_bytes(Lexer *l, size_t n)
     return true;
 }
 
-static char lexer_peek_first(Lexer *l)
+static inline char lexer_peek_first(Lexer *l)
 {
     return l->pos + 1 < l->size ? l->source[l->pos + 1] : '\0';
 }
 
-static char lexer_peek_second(Lexer *l)
+static inline char lexer_peek_second(Lexer *l)
 {
     return l->pos + 2 < l->size ? l->source[l->pos + 2] : '\0';
 }
@@ -100,12 +100,12 @@ static bool lexer_starts_with(Lexer *l, const char *prefix)
     return false;
 }
 
-static bool lexer_is_ident_start(char c)
+static inline bool lexer_is_ident_start(char c)
 {
     return isalpha(c) || c == '_';
 }
 
-static bool lexer_is_ident_cont(char c)
+static inline bool lexer_is_ident_cont(char c)
 {
     return isalnum(c) || c == '_';
 }
