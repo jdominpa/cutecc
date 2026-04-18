@@ -2,6 +2,7 @@
 #define DIAG_H_
 
 #include <stddef.h>
+#include <stdnoreturn.h>
 
 typedef struct {
     const char *file_path;
@@ -15,6 +16,9 @@ typedef enum {
     DIAG_ERROR,
 } DiagLevel;
 
-void diag_report(DiagLevel level, Loc loc, const char *fmt, ...);
+void diag_report(DiagLevel level, const char *fmt, ...);
+void diag_report_at(DiagLevel level, Loc loc, const char *fmt, ...);
+
+#define diag_report_at_token(level, t, fmt) diag_report_at((level), (t).loc, (fmt))
 
 #endif  // DIAG_H_

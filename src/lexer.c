@@ -20,30 +20,21 @@ Lexer lexer_init_from_file_path(const char *file_path)
 {
     /* Read file */
     FILE *f = fopen(file_path, "rb");
-    if (f == NULL) {
+    if (f == NULL)
         diag_report(DIAG_ERROR,
-                    (Loc) { .file_path = file_path, .line = 1, .col = 1 },
                     "could not open file '%s' for parsing", file_path);
-        exit(1);
-    }
     fseek(f, 0, SEEK_END);
     size_t size = ftell(f);
     fseek(f, 0, SEEK_SET);
     char *source = malloc(size + 1);
-    if (source == NULL) {
+    if (source == NULL)
         diag_report(DIAG_ERROR,
-                    (Loc) { .file_path = file_path, .line = 1, .col = 1 },
                     "could not allocate memory to read file '%s'", file_path);
-        exit(1);
-    }
     size_t size_read = fread(source, 1, size, f);
-    if (size_read != size) {
+    if (size_read != size)
         diag_report(DIAG_ERROR,
-                    (Loc) { .file_path = file_path, .line = 1, .col = 1 },
                     "expected %zu bytes from file '%s' but got %zu", size,
                     file_path, size_read);
-        exit(1);
-    }
     fclose(f);
     source[size] = '\0';
 
@@ -151,11 +142,9 @@ Token lexer_next_token(Lexer *l)
                 lexer_bump_bytes(l, 2);
                 while (l->pos < l->size && !lexer_starts_with(l, "*/"))
                     lexer_bump(l);
-                if (l->pos >= l->size) {
-                    diag_report(DIAG_ERROR, comment_beg,
-                                "unclosed comment block");
-                    exit(1);
-                }
+                if (l->pos >= l->size)
+                    diag_report_at(DIAG_ERROR, comment_beg,
+                                   "unclosed comment block");
                 lexer_bump_bytes(l, 2);
                 continue;
             default:
@@ -205,18 +194,14 @@ Token lexer_next_token(Lexer *l)
         t.start = l->source + l->pos;
         lexer_bump(l);
         while (l->pos < l->size && l->source[l->pos] != '"') {
-            if (l->source[l->pos] == '\n' || l->source[l->pos] == '\0') {
-                diag_report(DIAG_ERROR, t.loc, "unclosed string literal");
-                exit(1);
-            }
+            if (l->source[l->pos] == '\n' || l->source[l->pos] == '\0')
+                diag_report_at_token(DIAG_ERROR, t, "unclosed string literal");
             if (l->source[l->pos] == '\\')
                 lexer_bump(l);
             lexer_bump(l);
         }
-        if (l->pos >= l->size) {
-            diag_report(DIAG_ERROR, t.loc, "unclosed string literal");
-            exit(1);
-        }
+        if (l->pos >= l->size)
+            diag_report_at_token(DIAG_ERROR, t, "unclosed string literal");
         lexer_bump(l);
         t.len = l->pos - (t.start - l->source);
         return t;
