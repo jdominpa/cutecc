@@ -5,10 +5,11 @@
 #include <stddef.h>
 
 #include "arena.h"
+#include "ast.h"
 #include "lexer.h"
 
 typedef struct {
-    Arena a;
+    Arena *a;
     Token *tokens;
     size_t token_count;
     size_t pos;
@@ -16,6 +17,7 @@ typedef struct {
     size_t err_count;
 } Parser;
 
-Parser parser_init(const char *file_path);
+Parser parser_init_from_file_path(Arena *a, const char *file_path);
+void parse_transl_unit(Parser *p);
 
 #endif  // PARSER_H_

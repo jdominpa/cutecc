@@ -94,8 +94,10 @@ int main(int argc, char **argv)
     }
 
     for (size_t i = 0; i < input_files.count; ++i) {
+        const char *input_file = input_files.items[i];
+
         if (opt_E) {
-            Lexer l = lexer_init_from_file_path(input_files.items[i]);
+            Lexer l = lexer_init_from_file_path(input_file);
             print_tokens(&l);
             return 0;
         }
@@ -104,6 +106,9 @@ int main(int argc, char **argv)
         Arena ast_arena = arena_init();
 
         // Parse translation unit
+        Parser p = parser_init_from_file_path(&ast_arena, input_file);
+        parse_transl_unit(&p);
+
         // (possible IR)
         // Compile to assembly
         // Link
