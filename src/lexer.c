@@ -91,17 +91,17 @@ static bool lexer_starts_with(Lexer *l, const char *prefix)
     return false;
 }
 
-static inline bool lexer_is_ident_start(char c)
+static inline bool is_ident_start(char c)
 {
     return isalpha(c) || c == '_';
 }
 
-static inline bool lexer_is_ident_cont(char c)
+static inline bool is_ident_cont(char c)
 {
     return isalnum(c) || c == '_';
 }
 
-static bool lexer_is_keyword(const char *symbol)
+static bool is_keyword(const char *symbol)
 {
     const char *keywords[] = {
         "alignas", "alignof", "auto", "bool", "break", "case", "char",
@@ -164,14 +164,14 @@ Token lexer_next_token(Lexer *l)
     }
 
     // Identifier/Keyword
-    if (lexer_is_ident_start(l->source[l->pos])) {
+    if (is_ident_start(l->source[l->pos])) {
         t.kind = TK_IDENT;
         t.start = l->source + l->pos;
-        while (l->pos < l->size && lexer_is_ident_cont(l->source[l->pos])) {
+        while (l->pos < l->size && is_ident_cont(l->source[l->pos])) {
             t.len++;
             lexer_bump(l);
         }
-        if (lexer_is_keyword(t.start))
+        if (is_keyword(t.start))
             t.kind = TK_KW;
         return t;
     }
