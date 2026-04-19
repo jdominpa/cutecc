@@ -19,6 +19,7 @@ typedef enum {
 void diag_report(DiagLevel level, const char *fmt, ...);
 void diag_report_at(DiagLevel level, Loc loc, const char *fmt, ...);
 
-#define diag_report_at_token(level, t, fmt) diag_report_at((level), (t).loc, (fmt))
+#define diag_report_at_token(level, t, fmt, ...) \
+    diag_report_at((level), (t).loc, (fmt) __VA_OPT__(, ) __VA_ARGS__)
 
 #endif  // DIAG_H_
