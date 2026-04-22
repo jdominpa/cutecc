@@ -21,20 +21,17 @@ Lexer lexer_init_from_file_path(const char *file_path)
     /* Read file */
     FILE *f = fopen(file_path, "rb");
     if (f == NULL)
-        diag_report(DIAG_ERROR,
-                    "could not open file '%s' for parsing", file_path);
+        diag_fatal("could not open file '%s' for parsing", file_path);
     fseek(f, 0, SEEK_END);
     size_t size = ftell(f);
     fseek(f, 0, SEEK_SET);
     char *source = malloc(size + 1);
     if (source == NULL)
-        diag_report(DIAG_ERROR,
-                    "could not allocate memory to read file '%s'", file_path);
+        diag_fatal("could not allocate memory to read file '%s'", file_path);
     size_t size_read = fread(source, 1, size, f);
     if (size_read != size)
-        diag_report(DIAG_ERROR,
-                    "expected %zu bytes from file '%s' but got %zu", size,
-                    file_path, size_read);
+        diag_fatal("expected %zu bytes from file '%s' but got %zu", size,
+                   file_path, size_read);
     fclose(f);
     source[size] = '\0';
 
@@ -137,16 +134,16 @@ Token lexer_next_token(Lexer *l)
                        l->source[l->pos] != '\n')
                     lexer_bump(l);
                 continue;
-            case '*':
+            case '*': {
                 Loc comment_beg = lexer_get_loc(l);
                 lexer_bump_bytes(l, 2);
                 while (l->pos < l->size && !lexer_starts_with(l, "*/"))
                     lexer_bump(l);
                 if (l->pos >= l->size)
-                    diag_report_at(DIAG_ERROR, comment_beg,
-                                   "unclosed comment block");
+                    diag_fatal_at(comment_beg, "unclosed comment block");
                 lexer_bump_bytes(l, 2);
                 continue;
+            }
             default:
                 break;
             }
@@ -163,10 +160,11 @@ Token lexer_next_token(Lexer *l)
         return t;
     }
 
+    t.start = l->source + l->pos;
+
     // Identifier/Keyword
     if (is_ident_start(l->source[l->pos])) {
         t.kind = TK_IDENT;
-        t.start = l->source + l->pos;
         while (l->pos < l->size && is_ident_cont(l->source[l->pos])) {
             t.len++;
             lexer_bump(l);
@@ -191,17 +189,16 @@ Token lexer_next_token(Lexer *l)
     // String
     if (l->source[l->pos] == '"') {
         t.kind = TK_STR;
-        t.start = l->source + l->pos;
         lexer_bump(l);
         while (l->pos < l->size && l->source[l->pos] != '"') {
             if (l->source[l->pos] == '\n' || l->source[l->pos] == '\0')
-                diag_report_at_token(DIAG_ERROR, t, "unclosed string literal");
+                diag_fatal_at(t.loc, "unclosed string literal");
             if (l->source[l->pos] == '\\')
                 lexer_bump(l);
             lexer_bump(l);
         }
         if (l->pos >= l->size)
-            diag_report_at_token(DIAG_ERROR, t, "unclosed string literal");
+            diag_fatal_at(t.loc, "unclosed string literal");
         lexer_bump(l);
         t.len = l->pos - (t.start - l->source);
         return t;
@@ -210,7 +207,6 @@ Token lexer_next_token(Lexer *l)
 #define MAKE_TOKEN(k, length)          \
     do {                               \
         t.kind = (k);                  \
-        t.start = l->source + l->pos;  \
         t.len = (length);              \
         lexer_bump_bytes(l, (length)); \
         return t;                      \
@@ -353,7 +349,6 @@ Token lexer_next_token(Lexer *l)
 
 #undef MAKE_TOKEN
 
-    t.start = l->source + l->pos;
     t.len = 1;
     lexer_bump(l);
     return t;

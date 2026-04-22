@@ -13,8 +13,9 @@ typedef enum {
     // Literals
     TK_IDENT,                   // identifier
     TK_KW,                      // keyword
-    TK_NUM,                     // number
+    TK_CHAR,                    // character
     TK_STR,                     // string
+    TK_NUM,                     // number
 
     // Punctuators
     TK_OPAREN,                  // (

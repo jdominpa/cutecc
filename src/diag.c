@@ -10,32 +10,41 @@ const char *diag_level_as_str[] = {
     [DIAG_ERROR] = "error",
 };
 
-void diag_report(DiagLevel level, const char *fmt, ...)
+static void vdiag_report_at(DiagLevel level, Loc loc, const char *fmt, va_list va_args)
 {
-    va_list args;
-    va_start(args, fmt);
-
-    fprintf(stderr, "cutecc: %s: ", diag_level_as_str[level]);
-    vfprintf(stderr, fmt, args);
+    fprintf(stderr, "%s:%zu:%zu: %s: ",
+            loc.file_path, loc.line, loc.col,
+            diag_level_as_str[level]);
+    vfprintf(stderr, fmt, va_args);
     fprintf(stderr, "\n");
-
-    va_end(args);
-    // TODO: handle errors more gracefully
-    if (level == DIAG_ERROR)
-        exit(1);
 }
 
 void diag_report_at(DiagLevel level, Loc loc, const char *fmt, ...)
 {
+    va_list va_args;
+    va_start(va_args, fmt);
+    vdiag_report_at(level, loc, fmt, va_args);
+    va_end(va_args);
+}
+
+noreturn void diag_fatal(const char *fmt, ...)
+{
     va_list args;
     va_start(args, fmt);
 
-    fprintf(stderr, "%s:%zu:%zu: %s: ", loc.file_path, loc.line, loc.col, diag_level_as_str[level]);
+    fprintf(stderr, "cutecc: fatal error: ");
     vfprintf(stderr, fmt, args);
     fprintf(stderr, "\n");
 
     va_end(args);
-    // TODO: handle errors more gracefully
-    if (level == DIAG_ERROR)
-        exit(1);
+    exit(1);
+}
+
+noreturn void diag_fatal_at(Loc loc, const char *fmt, ...)
+{
+    va_list va_args;
+    va_start(va_args, fmt);
+    vdiag_report_at(DIAG_ERROR, loc, fmt, va_args);
+    va_end(va_args);
+    exit(1);
 }
