@@ -174,15 +174,23 @@ Token lexer_next_token(Lexer *l)
         return t;
     }
 
-    // Number
-    if (isdigit(l->source[l->pos])) {
-        t.kind = TK_NUM;
-        t.start = l->source + l->pos;
-        // TODO: handle non-integer numbers
-        while (l->pos < l->size && isdigit(l->source[l->pos])) {
-            t.len++;
+    // TODO: the code to lex string and character tokens is almost the same. It
+    // should be combined
+    // Character
+    if (l->source[l->pos] == '\'') {
+        t.kind = TK_CHAR;
+        lexer_bump(l);
+        while (l->pos < l->size && l->source[l->pos] != '\'') {
+            if (l->source[l->pos] == '\n' || l->source[l->pos] == '\0')
+                diag_fatal_at(t.loc, "unclosed character literal");
+            if (l->source[l->pos] == '\\')
+                lexer_bump(l);
             lexer_bump(l);
         }
+        if (l->pos >= l->size)
+            diag_fatal_at(t.loc, "unclosed character literal");
+        lexer_bump(l);
+        t.len = l->pos - (t.start - l->source);
         return t;
     }
 
@@ -201,6 +209,17 @@ Token lexer_next_token(Lexer *l)
             diag_fatal_at(t.loc, "unclosed string literal");
         lexer_bump(l);
         t.len = l->pos - (t.start - l->source);
+        return t;
+    }
+
+    // Number
+    if (isdigit(l->source[l->pos])) {
+        t.kind = TK_NUM;
+        // TODO: handle non-integer numbers
+        while (l->pos < l->size && isdigit(l->source[l->pos])) {
+            t.len++;
+            lexer_bump(l);
+        }
         return t;
     }
 
