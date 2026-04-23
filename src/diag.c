@@ -8,6 +8,7 @@ const char *diag_level_as_str[] = {
     [DIAG_INFO] = "info",
     [DIAG_WARNING] = "warning",
     [DIAG_ERROR] = "error",
+    [DIAG_FATAL] = "fatal error",
 };
 
 static void vdiag_report_at(DiagLevel level, Loc loc, const char *fmt, va_list va_args)
@@ -44,7 +45,7 @@ noreturn void diag_fatal_at(Loc loc, const char *fmt, ...)
 {
     va_list va_args;
     va_start(va_args, fmt);
-    vdiag_report_at(DIAG_ERROR, loc, fmt, va_args);
+    vdiag_report_at(DIAG_FATAL, loc, fmt, va_args);
     va_end(va_args);
     exit(1);
 }

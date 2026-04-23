@@ -14,6 +14,7 @@ typedef enum {
     DIAG_INFO,
     DIAG_WARNING,
     DIAG_ERROR,
+    DIAG_FATAL,
 } DiagLevel;
 
 void diag_report_at(DiagLevel level, Loc loc, const char *fmt, ...);
