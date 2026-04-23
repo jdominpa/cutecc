@@ -24,9 +24,8 @@
               clang-tools
               cmake
               gcc
-              gdb
               self.formatter.${system}
-            ];
+            ] ++ lib.optionals (!pkgs.stdenv.hostPlatform.isDarwin) [ pkgs.gdb ];
           };
         }
       );
