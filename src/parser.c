@@ -216,7 +216,7 @@ static bool try_get_op_bp(Token t, BindPower *bp)
     case TK_EQ:                                             // "="
         bp->left = 3; bp->right = 2;
         return true;
-    case TK_QUESTION:                                       // "?" ":"
+    case TK_QUESTION: case TK_COLON:                        // "?" ":"
         bp->left = 4; bp->right = 3;
         return true;
     case TK_PIPE_PIPE:                                      // "||"
@@ -284,6 +284,13 @@ static Expr *parse_expr_head(Parser *p)
     Token t = p->tokens[p->pos];
     parser_bump(p);
     switch (t.kind) {
+    case TK_IDENT: {
+        Expr *e = arena_alloc(p->a, Expr);
+        e->kind = EXPR_VAR;
+        e->loc = t.loc;
+        e->var = strndup(t.start, t.len);
+        return e;
+    }
     // TODO: parse character literals
     case TK_STR: {
         Expr *e = arena_alloc(p->a, Expr);
@@ -301,17 +308,10 @@ static Expr *parse_expr_head(Parser *p)
             e->val = e->val * 10 + (t.start[i] - '0');
         return e;
     }
-    case TK_IDENT: {
-        Expr *e = arena_alloc(p->a, Expr);
-        e->kind = EXPR_VAR;
-        e->loc = t.loc;
-        e->var = strndup(t.start, t.len);
-        return e;
-    }
     case TK_OPAREN: {
         Expr *e = parse_expr(p);
         if (!parser_expect(p, TK_CPAREN))
-            UNREACHABLE("parser_expect is nonreturnable");
+            UNREACHABLE("parser_expect is currently nonreturnable");
         return e;
     }
     case TK_PLUS:
@@ -359,18 +359,31 @@ static Expr *parse_expr_bp(Parser *p, uint8_t min_bp)
         if (op_bp.left < min_bp)
             break;
 
-        // Struct or struct pointer field access
-        if (parser_eat(p, TK_DOT) || parser_eat(p, TK_MINUS_GT)) {
-            Token field = p->tokens[p->pos];
-            if (!parser_expect(p, TK_IDENT))
-                UNREACHABLE("parser_expect is nonreturnable");
-            Expr *obj = e;
-            e = arena_alloc(p->a, Expr);
-            e->kind = op.kind == TK_DOT ? EXPR_FIELD : EXPR_ARROW;
-            e->field.field = strndup(field.start, field.len);
-            e->field.obj = obj;
+        // Postfix increment/decrement
+        if (parser_eat(p, TK_PLUS_PLUS) || parser_eat(p, TK_MINUS_MINUS)) {
+            e = new_unop_expr(p->a, op.loc,
+                              op.kind == TK_PLUS_PLUS ? UNOP_POST_INC : UNOP_POST_DEC, e);
             continue;
         }
+
+        // Ternary operator: expr "?" expr : expr
+        if (parser_eat(p, TK_QUESTION)) {
+            Expr *cond = e;
+            e = arena_alloc(p->a, Expr);
+            e->kind = EXPR_TERNOP;
+            e->ternop.cond = cond;
+            e->ternop.then = parse_expr_bp(p, op_bp.right);
+            op = p->tokens[p->pos];
+            if (!parser_expect(p, TK_COLON))
+                UNREACHABLE("parser_expect is currently nonreturnable");
+            if (!try_get_op_bp(op, &op_bp))
+                UNREACHABLE("parser_expect ensured we are at a `:` token");
+            e->ternop._else = parse_expr_bp(p, op_bp.right);
+            continue;
+        }
+        if (parser_check(p, TK_COLON))
+            // The else branch after `:` is parsed in the above if statement
+            break;
 
         // Array element access
         if (parser_eat(p, TK_OBRACK)) {
@@ -384,10 +397,16 @@ static Expr *parse_expr_bp(Parser *p, uint8_t min_bp)
             continue;
         }
 
-        // Postfix increment/decrement
-        if (parser_eat(p, TK_PLUS_PLUS) || parser_eat(p, TK_MINUS_MINUS)) {
-            e = new_unop_expr(p->a, op.loc,
-                              op.kind == TK_PLUS_PLUS ? UNOP_POST_INC : UNOP_POST_DEC, e);
+        // Struct or struct pointer field access
+        if (parser_eat(p, TK_DOT) || parser_eat(p, TK_MINUS_GT)) {
+            Token field = p->tokens[p->pos];
+            if (!parser_expect(p, TK_IDENT))
+                UNREACHABLE("parser_expect is currently nonreturnable");
+            Expr *obj = e;
+            e = arena_alloc(p->a, Expr);
+            e->kind = op.kind == TK_DOT ? EXPR_FIELD : EXPR_ARROW;
+            e->field.field = strndup(field.start, field.len);
+            e->field.obj = obj;
             continue;
         }
 
@@ -530,6 +549,15 @@ static void print_expr_as_sexp(Expr *e)
         print_expr_as_sexp(e->binop.lhs);
         printf(" ");
         print_expr_as_sexp(e->binop.rhs);
+        printf(")");
+        break;
+    case EXPR_TERNOP:
+        printf("(if ");
+        print_expr_as_sexp(e->ternop.cond);
+        printf(" then ");
+        print_expr_as_sexp(e->ternop.then);
+        printf(" else ");
+        print_expr_as_sexp(e->ternop._else);
         printf(")");
         break;
     case EXPR_ASSIGN:
