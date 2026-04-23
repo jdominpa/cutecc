@@ -405,8 +405,8 @@ static Expr *parse_expr_bp(Parser *p, uint8_t min_bp)
             Expr *obj = e;
             e = arena_alloc(p->a, Expr);
             e->kind = op.kind == TK_DOT ? EXPR_FIELD : EXPR_ARROW;
+            e->field._struct = obj;
             e->field.field = strndup(field.start, field.len);
-            e->field.obj = obj;
             continue;
         }
 
@@ -650,11 +650,11 @@ static void print_expr_as_sexp(Expr *e)
         printf("]");
         break;
     case EXPR_FIELD:
-        print_expr_as_sexp(e->field.obj);
+        print_expr_as_sexp(e->field._struct);
         printf(".%s", e->field.field);
         break;
     case EXPR_ARROW:
-        print_expr_as_sexp(e->field.obj);
+        print_expr_as_sexp(e->field._struct);
         printf("->%s", e->field.field);
         break;
     default:

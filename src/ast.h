@@ -160,8 +160,8 @@ struct Expr {
             Expr *index;
         } index;
         struct {
+            Expr *_struct;
             const char *field;
-            Expr *obj;
         } field;
         struct {
             Type *type;
