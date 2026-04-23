@@ -107,7 +107,7 @@ typedef enum {
     EXPR_CHAR,      // character literal
     EXPR_STR,       // string literal
     EXPR_NUM,       // numeric literal
-    EXPR_VAR,       // variable name
+    EXPR_NAME,      // variable/function name
     EXPR_UNOP,      // -x, ~x, !x, *x, &x, ++x, x++, --x, x--
     EXPR_BINOP,     // +, -, *, /, %, etc.
     EXPR_TERNOP,    // cond ? then : else
@@ -130,7 +130,7 @@ struct Expr {
         char c;
         const char *str;
         int val;
-        const char *var;
+        const char *name;
         struct {
             UnopKind kind;
             Expr *operand;

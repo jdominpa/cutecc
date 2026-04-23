@@ -286,9 +286,9 @@ static Expr *parse_expr_head(Parser *p)
     switch (t.kind) {
     case TK_IDENT: {
         Expr *e = arena_alloc(p->a, Expr);
-        e->kind = EXPR_VAR;
+        e->kind = EXPR_NAME;
         e->loc = t.loc;
-        e->var = strndup(t.start, t.len);
+        e->name = strndup(t.start, t.len);
         return e;
     }
     // TODO: parse character literals
@@ -438,8 +438,8 @@ static void print_expr_as_sexp(Expr *e)
     case EXPR_NUM:
         printf("%d", e->val);
         break;
-    case EXPR_VAR:
-        printf("%s", e->var);
+    case EXPR_NAME:
+        printf("%s", e->name);
         break;
     case EXPR_UNOP:
         switch (e->unop.kind) {
