@@ -250,8 +250,11 @@ static bool try_get_op_bp(Token t, BindPower *bp)
     case TK_STAR: case TK_SLASH: case TK_PERCENT:           // "*", "/", "%"
         bp->left = 12; bp->right = 13;
         return true;
+    // NOTE: `get_prefix_op_bp` needs to be updated if the highest postfix
+    // operator changes
     case TK_DOT: case TK_MINUS_GT:                          // ".", "->"
     case TK_OPAREN: case TK_OBRACK:                         // "(", "["
+    case TK_PLUS_PLUS: case TK_MINUS_MINUS:                 // "++", "--"
         bp->left = 13; bp->right = 14;
         return true;
     default:
@@ -264,7 +267,7 @@ static uint8_t get_prefix_op_bp(void)
     BindPower bp;
     // The prefix left binding power equals the right binding power of the
     // tightest postfix operator (i.e. *p++ == *(p++)).
-    if (!try_get_op_bp((Token) { .kind = TK_OBRACK }, &bp))
+    if (!try_get_op_bp((Token) { .kind = TK_MINUS_MINUS }, &bp))
         UNREACHABLE("get_prefix_bp called with non-operation token");
     return bp.left;
 }
@@ -381,6 +384,13 @@ static Expr *parse_expr_bp(Parser *p, uint8_t min_bp)
             continue;
         }
 
+        // Postfix increment/decrement
+        if (parser_eat(p, TK_PLUS_PLUS) || parser_eat(p, TK_MINUS_MINUS)) {
+            e = new_unop_expr(p->a, op.loc,
+                              op.kind == TK_PLUS_PLUS ? UNOP_POST_INC : UNOP_POST_DEC, e);
+            continue;
+        }
+
         parser_bump(p);
         if (is_assign_op(op.kind))
             e = new_assign_expr(p->a, op.loc, get_assign_kind(op),
@@ -445,6 +455,14 @@ static void print_expr_as_sexp(Expr *e)
         case UNOP_PRE_DEC:
             printf("--");
             print_expr_as_sexp(e->unop.operand);
+            break;
+        case UNOP_POST_INC:
+            print_expr_as_sexp(e->unop.operand);
+            printf("++");
+            break;
+        case UNOP_POST_DEC:
+            print_expr_as_sexp(e->unop.operand);
+            printf("--");
             break;
         default:
             UNREACHABLE("e->unop.kind at print_expr_as_sexp");
