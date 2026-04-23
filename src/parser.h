@@ -17,6 +17,11 @@ typedef struct {
     size_t err_count;
 } Parser;
 
+typedef struct {
+    uint8_t left;
+    uint8_t right;
+} BindPower;
+
 Parser parser_init_from_file_path(Arena *a, const char *file_path);
 void parse_transl_unit(Parser *p);
 

@@ -56,29 +56,69 @@ struct Type {
 //
 
 typedef enum {
-    BINOP_PLUS,      // expr `+` expr
-    BINOP_MINUS,     // expr `-` expr
-    BINOP_MULT,      // expr `*` expr
-    BINOP_DIV,       // expr `/` expr
+    UNOP_POS,       // +x
+    UNOP_NEG,       // -x
+    UNOP_NOT,       // !x
+    UNOP_BIT_NOT,   // ~x
+    UNOP_DEREF,     // *x
+    UNOP_ADDR,      // &x
+    UNOP_PRE_INC,   // ++x
+    UNOP_PRE_DEC,   // --x
+    UNOP_POST_INC,  // x++
+    UNOP_POST_DEC,  // x--
+} UnopKind;
+
+typedef enum {
+    BINOP_OR,       // `||`
+    BINOP_AND,      // `&&`
+    BINOP_BIT_OR,   // `|`
+    BINOP_BIT_XOR,  // `^`
+    BINOP_BIT_AND,  // `&`
+    BINOP_EQ,       // `==`
+    BINOP_NOT_EQ,   // `!=`
+    BINOP_LT,       // `<`
+    BINOP_LT_EQ,    // `<=`
+    BINOP_GT,       // `>`
+    BINOP_GT_EQ,    // `>=`
+    BINOP_LSFT,     // `<<`
+    BINOP_RSFT,     // `>>`
+    BINOP_PLUS,     // `+`
+    BINOP_MINUS,    // `-`
+    BINOP_MULT,     // `*`
+    BINOP_DIV,      // `/`
+    BINOP_MOD,      // `%`
 } BinopKind;
 
 typedef enum {
-    EXPR_CHAR,       // character literal
-    EXPR_STR,        // string literal
-    EXPR_NUM,        // numeric literal
-    EXPR_VAR,        // variable name
-    EXPR_UNOP,       // -x, ~x, !x, *x, &x, ++x, x++, --x, x--
-    EXPR_BINOP,      // +, -, *, /, %, etc.
-    EXPR_TERNOP,     // cond ? then : else
-    EXPR_FUNCALL,    // f(args)
-    EXPR_ASSIGN,     // Type var = value
-    EXPR_INDEX,      // a[i]
-    EXPR_FIELD,      // s.x
-    EXPR_ARROW,      // p->x
-    EXPR_CAST,       // (int) expr
-    EXPR_SIZEOF_TY,  // sizeof(int)
-    EXPR_SIZEOF_EX,  // sizeof expr
-    EXPR_PAREN,      // (expr) — kept as a node for span accuracy
+    ASSIGN_AND,     // `&=`
+    ASSIGN_XOR,     // `^=`
+    ASSIGN_OR,      // `|=`
+    ASSIGN_LSFT,    // `<<=`
+    ASSIGN_RSFT,    // `>>=`
+    ASSIGN_MULT,    // `*=`
+    ASSIGN_DIV,     // `/=`
+    ASSIGN_MOD,     // `%=`
+    ASSIGN_PLUS,    // `+=`
+    ASSIGN_MINUS,   // `-=`
+    ASSIGN_EQ,      // `=`
+} AssignKind;
+
+typedef enum {
+    EXPR_CHAR,      // character literal
+    EXPR_STR,       // string literal
+    EXPR_NUM,       // numeric literal
+    EXPR_VAR,       // variable name
+    EXPR_UNOP,      // -x, ~x, !x, *x, &x, ++x, x++, --x, x--
+    EXPR_BINOP,     // +, -, *, /, %, etc.
+    EXPR_TERNOP,    // cond ? then : else
+    EXPR_FUNCALL,   // f(args)
+    EXPR_ASSIGN,    // Type var = value
+    EXPR_INDEX,     // a[i]
+    EXPR_FIELD,     // s.x
+    EXPR_ARROW,     // p->x
+    EXPR_CAST,      // (int) expr
+    EXPR_SIZEOF_TY, // sizeof(int)
+    EXPR_SIZEOF_EX, // sizeof expr
     EXPR_COUNT,
 } ExprKind;
 
@@ -92,7 +132,7 @@ struct Expr {
         int val;
         const char *var;
         struct {
-            const char *op;
+            UnopKind kind;
             Expr *operand;
         } unop;
         struct {
@@ -101,10 +141,9 @@ struct Expr {
             Expr *rhs;
         } binop;
         struct {
-            const char *op;
-            Expr *first;
-            Expr *second;
-            Expr *third;
+            Expr *cond;
+            Expr *then;
+            Expr *_else;
         } ternop;
         struct {
             const char *fun;
@@ -112,28 +151,24 @@ struct Expr {
             size_t argc;
         } funcall;
         struct {
+            AssignKind kind;
             Expr *var;
             Expr *value;
         } assign;
         struct {
             Expr *array;
-            Expr *idx;
+            Expr *index;
         } index;
         struct {
-            Expr *obj;
             const char *field;
+            Expr *obj;
         } field;
-        struct {
-            Expr *obj;
-            const char *field;
-        } arrow;
         struct {
             Type *type;
             Expr *expr;
         } cast;
         Type *sizeof_ty;
         Expr *sizeof_expr;
-        Expr *paren;
     };
 };
 
