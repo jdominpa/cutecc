@@ -371,6 +371,7 @@ static Expr *parse_expr_bp(Parser *p, uint8_t min_bp)
             Expr *cond = e;
             e = arena_alloc(p->a, Expr);
             e->kind = EXPR_TERNOP;
+            e->loc = op.loc;
             e->ternop.cond = cond;
             e->ternop.then = parse_expr_bp(p, op_bp.right);
             op = p->tokens[p->pos];
@@ -390,6 +391,7 @@ static Expr *parse_expr_bp(Parser *p, uint8_t min_bp)
             Expr *array = e;
             e = arena_alloc(p->a, Expr);
             e->kind = EXPR_INDEX;
+            e->loc = op.loc;
             e->index.array = array;
             e->index.index = parse_expr(p);
             if (!parser_expect(p, TK_CBRACK))
@@ -405,6 +407,7 @@ static Expr *parse_expr_bp(Parser *p, uint8_t min_bp)
             Expr *obj = e;
             e = arena_alloc(p->a, Expr);
             e->kind = op.kind == TK_DOT ? EXPR_FIELD : EXPR_ARROW;
+            e->loc = op.loc;
             e->field._struct = obj;
             e->field.field = strndup(field.start, field.len);
             continue;
