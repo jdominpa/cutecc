@@ -111,7 +111,7 @@ typedef enum {
     EXPR_UNOP,      // -x, ~x, !x, *x, &x, ++x, x++, --x, x--
     EXPR_BINOP,     // +, -, *, /, %, etc.
     EXPR_TERNOP,    // cond ? then : else
-    EXPR_FUNCALL,   // f(args)
+    EXPR_FN_CALL,   // f(args)
     EXPR_ASSIGN,    // Type var = value
     EXPR_INDEX,     // a[i]
     EXPR_FIELD,     // s.x
@@ -146,10 +146,10 @@ struct Expr {
             Expr *_else;
         } ternop;
         struct {
-            const char *fun;
-            Expr **args;
+            const char *fn_name;
             size_t argc;
-        } funcall;
+            Expr **args;
+        } fn_call;
         struct {
             AssignKind kind;
             Expr *var;
