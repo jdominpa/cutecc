@@ -203,73 +203,58 @@ static bool is_assign_op(TokenKind kind)
     }
 }
 
-static bool try_get_op_bp(Token t, BindPower *bp)
+// Returns the binding power (left,right) of an operation with TokenKind `kind`.
+// If `kind` doesn't correspond to any operation the binding power is (0,0).
+static BindPower get_op_bp(TokenKind kind)
 {
-    switch (t.kind) {
+    switch (kind) {
     case TK_COMMA:                                          // ","
-        bp->left = 1; bp->right = 2;
-        return true;
+        return (BindPower) { .left = 1, .right = 2 };
     case TK_AMP_EQ:   case TK_CARET_EQ: case TK_PIPE_EQ:    // "&=", "^=", "|="
     case TK_LT_LT_EQ: case TK_GT_GT_EQ:                     // "<<=", ">>="
     case TK_STAR_EQ:  case TK_SLASH_EQ: case TK_PERCENT_EQ: // "*=", "/=", "%="
     case TK_PLUS_EQ:  case TK_MINUS_EQ:                     // "+=", "-="
     case TK_EQ:                                             // "="
-        bp->left = 3; bp->right = 2;
-        return true;
+        return (BindPower) { .left = 3, .right = 2 };
     case TK_QUESTION: case TK_COLON:                        // "?" ":"
-        bp->left = 4; bp->right = 3;
-        return true;
+        return (BindPower) { .left = 4, .right = 3 };
     case TK_PIPE_PIPE:                                      // "||"
-        bp->left = 4; bp->right = 5;
-        return true;
+        return (BindPower) { .left = 4, .right = 5 };
     case TK_AMP_AMP:                                        // "&&"
-        bp->left = 5; bp->right = 6;
-        return true;
+        return (BindPower) { .left = 5, .right = 6 };
     case TK_PIPE:                                           // "|"
-        bp->left = 6; bp->right = 7;
-        return true;
+        return (BindPower) { .left = 6, .right = 7 };
     case TK_CARET:                                          // "^"
-        bp->left = 7; bp->right = 8;
-        return true;
+        return (BindPower) { .left = 7, .right = 8 };
     case TK_AMP:                                            // "&"
-        bp->left = 8; bp->right = 9;
-        return true;
+        return (BindPower) { .left = 8, .right = 9 };
     case TK_EQ_EQ: case TK_BANG_EQ:                         // "==", "!="
-        bp->left = 9; bp->right = 10;
-        return true;
+        return (BindPower) { .left = 9, .right = 10 };
     case TK_LT: case TK_LT_EQ:                              // "<", "<="
     case TK_GT: case TK_GT_EQ:                              // ">", ">="
-        bp->left = 10; bp->right = 11;
-        return true;
+        return (BindPower) { .left = 10, .right = 11 };
     case TK_LT_LT: case TK_GT_GT:                           // "<<", ">>"
-        bp->left = 11; bp->right = 12;
-        return true;
+        return (BindPower) { .left = 11, .right = 12 };
     case TK_PLUS: case TK_MINUS:                            // "+", "-"
-        bp->left = 11; bp->right = 12;
-        return true;
+        return (BindPower) { .left = 11, .right = 12 };
     case TK_STAR: case TK_SLASH: case TK_PERCENT:           // "*", "/", "%"
-        bp->left = 12; bp->right = 13;
-        return true;
-    // NOTE: `get_prefix_op_bp` needs to be updated if the highest postfix
-    // operator changes
+        return (BindPower) { .left = 12, .right = 13 };
+    // NOTE: `get_prefix_op` needs to be updated if the highest postfix operator
+    // changes
     case TK_DOT: case TK_MINUS_GT:                          // ".", "->"
     case TK_OPAREN: case TK_OBRACK:                         // "(", "["
     case TK_PLUS_PLUS: case TK_MINUS_MINUS:                 // "++", "--"
-        bp->left = 13; bp->right = 14;
-        return true;
-    default:
-        return false;
+        return (BindPower) { .left = 13, .right = 14 };
+    default:                                                // non-operation
+        return (BindPower) { .left = 0, .right = 0 };
     }
 }
 
-static uint8_t get_prefix_op_bp(void)
+static inline uint8_t get_prefix_op_bp(void)
 {
-    BindPower bp;
     // The prefix left binding power equals the right binding power of the
     // tightest postfix operator (i.e. *p++ == *(p++)).
-    if (!try_get_op_bp((Token) { .kind = TK_MINUS_MINUS }, &bp))
-        UNREACHABLE("get_prefix_bp called with non-operation token");
-    return bp.left;
+    return get_op_bp(TK_MINUS_MINUS).left;
 }
 
 static Expr *parse_expr(Parser *p);
@@ -353,9 +338,7 @@ static Expr *parse_expr_bp(Parser *p, uint8_t min_bp)
         Token op = p->tokens[p->pos];
 
         // Operation precedence check
-        BindPower op_bp;
-        if (!try_get_op_bp(op, &op_bp))
-            break;
+        BindPower op_bp = get_op_bp(op.kind);
         if (op_bp.left < min_bp)
             break;
 
@@ -374,12 +357,9 @@ static Expr *parse_expr_bp(Parser *p, uint8_t min_bp)
             e->loc = op.loc;
             e->ternop.cond = cond;
             e->ternop.then = parse_expr_bp(p, op_bp.right);
-            op = p->tokens[p->pos];
             if (!parser_expect(p, TK_COLON))
                 UNREACHABLE("parser_expect is currently nonreturnable");
-            if (!try_get_op_bp(op, &op_bp))
-                UNREACHABLE("parser_expect ensured we are at a `:` token");
-            e->ternop._else = parse_expr_bp(p, op_bp.right);
+            e->ternop._else = parse_expr_bp(p, get_op_bp(TK_COLON).right);
             continue;
         }
         if (parser_check(p, TK_COLON))
@@ -424,7 +404,7 @@ static Expr *parse_expr_bp(Parser *p, uint8_t min_bp)
     return e;
 }
 
-static Expr *parse_expr(Parser *p)
+static inline Expr *parse_expr(Parser *p)
 {
     return parse_expr_bp(p, 0);
 }
