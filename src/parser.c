@@ -1,6 +1,7 @@
 #include "parser.h"
 
 #include <assert.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -411,7 +412,7 @@ static inline Expr *parse_expr(Parser *p)
     return parse_expr_bp(p, 1);
 }
 
-static void print_expr_as_sexp(Expr *e)
+static void print_expr_as_sexp(Expr *e, uint32_t indent)
 {
     switch (e->kind) {
     case EXPR_CHAR:
@@ -430,42 +431,42 @@ static void print_expr_as_sexp(Expr *e)
         switch (e->unop.kind) {
         case UNOP_POS:
             printf("+");
-            print_expr_as_sexp(e->unop.operand);
+            print_expr_as_sexp(e->unop.operand, indent);
             break;
         case UNOP_NEG:
             printf("-");
-            print_expr_as_sexp(e->unop.operand);
+            print_expr_as_sexp(e->unop.operand, indent);
             break;
         case UNOP_NOT:
             printf("!");
-            print_expr_as_sexp(e->unop.operand);
+            print_expr_as_sexp(e->unop.operand, indent);
             break;
         case UNOP_BIT_NOT:
             printf("~");
-            print_expr_as_sexp(e->unop.operand);
+            print_expr_as_sexp(e->unop.operand, indent);
             break;
         case UNOP_DEREF:
             printf("*");
-            print_expr_as_sexp(e->unop.operand);
+            print_expr_as_sexp(e->unop.operand, indent);
             break;
         case UNOP_ADDR:
             printf("&");
-            print_expr_as_sexp(e->unop.operand);
+            print_expr_as_sexp(e->unop.operand, indent);
             break;
         case UNOP_PRE_INC:
             printf("++");
-            print_expr_as_sexp(e->unop.operand);
+            print_expr_as_sexp(e->unop.operand, indent);
             break;
         case UNOP_PRE_DEC:
             printf("--");
-            print_expr_as_sexp(e->unop.operand);
+            print_expr_as_sexp(e->unop.operand, indent);
             break;
         case UNOP_POST_INC:
-            print_expr_as_sexp(e->unop.operand);
+            print_expr_as_sexp(e->unop.operand, indent);
             printf("++");
             break;
         case UNOP_POST_DEC:
-            print_expr_as_sexp(e->unop.operand);
+            print_expr_as_sexp(e->unop.operand, indent);
             printf("--");
             break;
         default:
@@ -475,153 +476,174 @@ static void print_expr_as_sexp(Expr *e)
     case EXPR_BINOP:
         switch (e->binop.kind) {
         case BINOP_OR:
-            printf("(|| ");
+            printf("(or ");
+            indent += 4;
             break;
         case BINOP_AND:
-            printf("(&& ");
+            printf("(and ");
+            indent += 5;
             break;
         case BINOP_BIT_OR:
             printf("(| ");
+            indent += 3;
             break;
         case BINOP_BIT_XOR:
             printf("(^ ");
+            indent += 3;
             break;
         case BINOP_BIT_AND:
             printf("(& ");
+            indent += 3;
             break;
         case BINOP_EQ:
             printf("(== ");
+            indent += 4;
             break;
         case BINOP_NOT_EQ:
             printf("(!= ");
+            indent += 4;
             break;
         case BINOP_LT:
             printf("(< ");
+            indent += 3;
             break;
         case BINOP_LT_EQ:
             printf("(<= ");
+            indent += 4;
             break;
         case BINOP_GT:
             printf("(> ");
+            indent += 3;
             break;
         case BINOP_GT_EQ:
             printf("(>= ");
+            indent += 4;
             break;
         case BINOP_LSFT:
             printf("(<< ");
+            indent += 4;
             break;
         case BINOP_RSFT:
             printf("(>> ");
+            indent += 4;
             break;
         case BINOP_PLUS:
             printf("(+ ");
+            indent += 3;
             break;
         case BINOP_MINUS:
             printf("(- ");
+            indent += 3;
             break;
         case BINOP_MULT:
             printf("(* ");
+            indent += 3;
             break;
         case BINOP_DIV:
             printf("(/ ");
+            indent += 3;
             break;
         case BINOP_MOD:
             printf("(%% ");
+            indent += 3;
             break;
         default:
             UNREACHABLE("e->binop.kind at print_expr_as_sexp");
         }
-        print_expr_as_sexp(e->binop.lhs);
-        printf(" ");
-        print_expr_as_sexp(e->binop.rhs);
+        print_expr_as_sexp(e->binop.lhs, indent);
+        printf("\n%*s", indent, "");
+        print_expr_as_sexp(e->binop.rhs, indent);
         printf(")");
         break;
     case EXPR_TERNOP:
         printf("(if ");
-        print_expr_as_sexp(e->ternop.cond);
-        printf(" then ");
-        print_expr_as_sexp(e->ternop.then);
-        printf(" else ");
-        print_expr_as_sexp(e->ternop._else);
+        indent += 4;
+        print_expr_as_sexp(e->ternop.cond, indent);
+        printf("\n%*s", indent, "");
+        print_expr_as_sexp(e->ternop.then, indent);
+        printf("\n%*s", indent - 1, "");
+        print_expr_as_sexp(e->ternop._else, indent);
         printf(")");
         break;
     case EXPR_ASSIGN:
         printf("(let ");
-        print_expr_as_sexp(e->assign.var);
-        printf(" ");
+        indent += 5;
+        print_expr_as_sexp(e->assign.var, indent);
+        printf("\n%*s", indent, "");
         switch (e->assign.kind) {
         case ASSIGN_AND:
             printf("(& ");
-            print_expr_as_sexp(e->assign.var);
-            printf(" ");
-            print_expr_as_sexp(e->assign.value);
+            indent += 3;
+            print_expr_as_sexp(e->assign.var, indent);
+            printf("\n%*s", indent, "");
+            print_expr_as_sexp(e->assign.value, indent);
             printf(")");
             break;
         case ASSIGN_XOR:
             printf("(^ ");
-            print_expr_as_sexp(e->assign.var);
+            print_expr_as_sexp(e->assign.var, indent);
             printf(" ");
-            print_expr_as_sexp(e->assign.value);
+            print_expr_as_sexp(e->assign.value, indent);
             printf(")");
             break;
         case ASSIGN_OR:
             printf("(| ");
-            print_expr_as_sexp(e->assign.var);
+            print_expr_as_sexp(e->assign.var, indent);
             printf(" ");
-            print_expr_as_sexp(e->assign.value);
+            print_expr_as_sexp(e->assign.value, indent);
             printf(")");
             break;
         case ASSIGN_LSFT:
             printf("(<< ");
-            print_expr_as_sexp(e->assign.var);
+            print_expr_as_sexp(e->assign.var, indent);
             printf(" ");
-            print_expr_as_sexp(e->assign.value);
+            print_expr_as_sexp(e->assign.value, indent);
             printf(")");
             break;
         case ASSIGN_RSFT:
             printf("(>> ");
-            print_expr_as_sexp(e->assign.var);
+            print_expr_as_sexp(e->assign.var, indent);
             printf(" ");
-            print_expr_as_sexp(e->assign.value);
+            print_expr_as_sexp(e->assign.value, indent);
             printf(")");
             break;
         case ASSIGN_MULT:
             printf("(* ");
-            print_expr_as_sexp(e->assign.var);
+            print_expr_as_sexp(e->assign.var, indent);
             printf(" ");
-            print_expr_as_sexp(e->assign.value);
+            print_expr_as_sexp(e->assign.value, indent);
             printf(")");
             break;
         case ASSIGN_DIV:
             printf("(/ ");
-            print_expr_as_sexp(e->assign.var);
+            print_expr_as_sexp(e->assign.var, indent);
             printf(" ");
-            print_expr_as_sexp(e->assign.value);
+            print_expr_as_sexp(e->assign.value, indent);
             printf(")");
             break;
         case ASSIGN_MOD:
             printf("(%% ");
-            print_expr_as_sexp(e->assign.var);
+            print_expr_as_sexp(e->assign.var, indent);
             printf(" ");
-            print_expr_as_sexp(e->assign.value);
+            print_expr_as_sexp(e->assign.value, indent);
             printf(")");
             break;
         case ASSIGN_PLUS:
             printf("(+ ");
-            print_expr_as_sexp(e->assign.var);
+            print_expr_as_sexp(e->assign.var, indent);
             printf(" ");
-            print_expr_as_sexp(e->assign.value);
+            print_expr_as_sexp(e->assign.value, indent);
             printf(")");
             break;
         case ASSIGN_MINUS:
             printf("(- ");
-            print_expr_as_sexp(e->assign.var);
+            print_expr_as_sexp(e->assign.var, indent);
             printf(" ");
-            print_expr_as_sexp(e->assign.value);
+            print_expr_as_sexp(e->assign.value, indent);
             printf(")");
             break;
         case ASSIGN_EQ:
-            print_expr_as_sexp(e->assign.value);
+            print_expr_as_sexp(e->assign.value, indent);
             break;
         default:
             UNREACHABLE("e->assign.kind at print_expr_as_sexp");
@@ -629,17 +651,17 @@ static void print_expr_as_sexp(Expr *e)
         printf(")");
         break;
     case EXPR_INDEX:
-        print_expr_as_sexp(e->index.array);
+        print_expr_as_sexp(e->index.array, indent);
         printf("\[");
-        print_expr_as_sexp(e->index.index);
+        print_expr_as_sexp(e->index.index, indent);
         printf("]");
         break;
     case EXPR_FIELD:
-        print_expr_as_sexp(e->field._struct);
+        print_expr_as_sexp(e->field._struct, indent);
         printf(".%s", e->field.field);
         break;
     case EXPR_ARROW:
-        print_expr_as_sexp(e->field._struct);
+        print_expr_as_sexp(e->field._struct, indent);
         printf("->%s", e->field.field);
         break;
     default:
@@ -672,6 +694,6 @@ Parser parser_init_from_file_path(Arena *a, const char *file_path)
 void parse_transl_unit(Parser *p)
 {
     Expr *e = parse_expr(p);
-    print_expr_as_sexp(e);
+    print_expr_as_sexp(e, 0);
     printf("\n");
 }
