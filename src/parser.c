@@ -406,7 +406,9 @@ static Expr *parse_expr_bp(Parser *p, uint8_t min_bp)
 
 static inline Expr *parse_expr(Parser *p)
 {
-    return parse_expr_bp(p, 0);
+    // NOTE: minimum binding power of any operation is 1. The binding power of
+    // any other token kind is 0.
+    return parse_expr_bp(p, 1);
 }
 
 static void print_expr_as_sexp(Expr *e)
