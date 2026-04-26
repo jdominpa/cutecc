@@ -146,9 +146,9 @@ static Expr *new_assign_expr(Arena *a, Loc loc, AssignKind kind, Expr *var, Expr
     return e;
 }
 
-static BinopKind get_binop_kind(Token t)
+static BinopKind get_binop_kind(TokenKind kind)
 {
-    switch (t.kind) {
+    switch (kind) {
     case TK_PIPE_PIPE: return BINOP_OR;
     case TK_AMP_AMP:   return BINOP_AND;
     case TK_PIPE:      return BINOP_BIT_OR;
@@ -172,9 +172,9 @@ static BinopKind get_binop_kind(Token t)
     }
 }
 
-static AssignKind get_assign_kind(Token t)
+static AssignKind get_assign_kind(TokenKind kind)
 {
-    switch (t.kind) {
+    switch (kind) {
     case TK_AMP_EQ:     return ASSIGN_AND;
     case TK_CARET_EQ:   return ASSIGN_XOR;
     case TK_PIPE_EQ:    return ASSIGN_OR;
@@ -252,10 +252,12 @@ static BindPower get_op_bp(TokenKind kind)
     }
 }
 
+// Returns the left binding power for prefix operations. Used when parsing the
+// operand of prefix unary operations.
 static inline uint8_t get_prefix_op_bp(void)
 {
     // The prefix left binding power equals the right binding power of the
-    // tightest postfix operator (i.e. *p++ == *(p++)).
+    // tightest postfix operator (i.e. *p++ == *(p++) and not *p++ != (*p)++).
     return get_op_bp(TK_MINUS_MINUS).left;
 }
 
@@ -299,8 +301,16 @@ static Expr **parse_fn_call_args(Parser *p, size_t *argc)
 }
 
 /*
-  expr_head = "(" expr ")"
+  Parses the head of an expression and returns it. The head of an expression is
+  constructed as follows:
+
+  expr_head = ident
+            | str
             | num
+            | "(" expr ")"
+            | unary_op expr
+
+  unary_op  = "+" | "-" | "!" | "~" | "*" | "&" | "++" | "--"
 */
 static Expr *parse_expr_head(Parser *p)
 {
@@ -367,8 +377,34 @@ static Expr *parse_expr_head(Parser *p)
     }
 }
 
-// expr      = expr_head expr_tail*
-// expr_tail = tail_op expr
+/*
+  Pratt parser algorithm implementation for expression parsing. An expression is
+  constructed in the following way:
+
+  expr      = expr_head expr_tail*
+
+  expr_head = ident
+            | str
+            | num
+            | "(" expr ")"
+            | unary_op expr
+
+  expr_tail = "?" expr ":" expr
+            | "(" expr1 "," expr2 "," ... ")"
+            | "[" expr "]"
+            | ("." | "->") field_name
+            | tail_op expr
+
+  unary_op  = "+" | "-" | "!" | "~" | "*" | "&" | "++" | "--"
+
+  tail_op   = "++" | "--" | assign_op | bin_op
+
+  assign_op = "&=" | "^=" | "|=" | "<<=" | ">>="
+            | "*=" | "/=" | "%=" | "+=" | "-=" | "="
+
+  bin_op    = "||" | "&&" | "|" | "^" | "==" | "!=" | "<" | "<="
+            | ">" | ">=" | "<<" | ">>" | "+" | "-" | "*" | "/" | "%"
+*/
 static Expr *parse_expr_bp(Parser *p, uint8_t min_bp)
 {
     Expr *e = parse_expr_head(p);
@@ -446,15 +482,17 @@ static Expr *parse_expr_bp(Parser *p, uint8_t min_bp)
 
         parser_bump(p);
         if (is_assign_op(op.kind))
-            e = new_assign_expr(p->a, op.loc, get_assign_kind(op),
+            e = new_assign_expr(p->a, op.loc, get_assign_kind(op.kind),
                                 e, parse_expr_bp(p, op_bp.right));
         else
-            e = new_binop_expr(p->a, op.loc, get_binop_kind(op),
+            e = new_binop_expr(p->a, op.loc, get_binop_kind(op.kind),
                                e, parse_expr_bp(p, op_bp.right));
     }
     return e;
 }
 
+// Wrapper function for `parse_expr_bp` with the minimum binding power set to
+// the lowest binding power of any operation.
 static inline Expr *parse_expr(Parser *p)
 {
     // NOTE: minimum binding power of any operation is 1. The binding power of
