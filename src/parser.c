@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "arena.h"
@@ -261,6 +262,42 @@ static inline uint8_t get_prefix_op_bp(void)
 static Expr *parse_expr(Parser *p);
 static Expr *parse_expr_bp(Parser *p, uint8_t min_bp);
 
+// Parses and returns the arguments in a function call while storing the
+// argument count in `argc`. Must be called after consuming the open paren of
+// the function call. After returning the parser will be at the closing paren.
+static Expr **parse_fn_call_args(Parser *p, size_t *argc)
+{
+    size_t capacity = 4;
+    Expr **tmp = malloc(capacity * sizeof(Expr *));
+    if (tmp == NULL)
+        diag_fatal("could not allocate temporary memory to parse function arguments");
+
+    *argc = 0;
+    uint8_t min_arg_bp = get_op_bp(TK_COMMA).right;
+    while (!parser_at_eof(p) && !parser_check(p, TK_CPAREN)) {
+        if (*argc >= capacity) {
+            capacity *= 2;
+            tmp = realloc(tmp, capacity * sizeof(Expr *));
+            if (tmp == NULL)
+                diag_fatal("could not allocate temporary memory to parse function arguments");
+        }
+        tmp[(*argc)++] = parse_expr_bp(p, min_arg_bp);
+        if (!parser_eat(p, TK_COMMA))
+            break;
+        if (parser_check(p, TK_CPAREN))
+            diag_fatal_at(p->tokens[p->pos].loc, "trailing comma in function call argument list");
+    }
+
+    if (*argc == 0) {
+        free(tmp);
+        return NULL;
+    }
+    Expr **args = arena_alloc_many(p->a, Expr *, *argc);
+    memcpy(args, tmp, *argc * sizeof(Expr *));
+    free(tmp);
+    return args;
+}
+
 /*
   expr_head = "(" expr ")"
             | num
@@ -366,6 +403,19 @@ static Expr *parse_expr_bp(Parser *p, uint8_t min_bp)
         if (parser_check(p, TK_COLON))
             // The else branch after `:` is parsed in the above if statement
             break;
+
+        // Function call
+        if (parser_eat(p, TK_OPAREN)) {
+            if (e->kind != EXPR_NAME)
+                diag_fatal_at(e->loc, "invalid identifier used as function name");
+            const char *fn_name = e->name;
+            e->kind = EXPR_FN_CALL;
+            e->fn_call.fn_name = fn_name;
+            e->fn_call.args = parse_fn_call_args(p, &e->fn_call.argc);
+            if (!parser_expect(p, TK_CPAREN))
+                UNREACHABLE("parser_expect is currently nonreturnable");
+            continue;
+        }
 
         // Array element access
         if (parser_eat(p, TK_OBRACK)) {
@@ -563,6 +613,19 @@ static void print_expr_as_sexp(Expr *e, uint32_t indent)
         print_expr_as_sexp(e->ternop.then, indent);
         printf("\n%*s", indent - 1, "");
         print_expr_as_sexp(e->ternop._else, indent);
+        printf(")");
+        break;
+    case EXPR_FN_CALL:
+        printf("(%s", e->fn_call.fn_name);
+        if (e->fn_call.argc > 0) {
+            printf(" ");
+            indent += 2 + strlen(e->fn_call.fn_name);
+            print_expr_as_sexp(e->fn_call.args[0], indent);
+            for (size_t i = 1; i < e->fn_call.argc; ++i) {
+                printf("\n%*s", indent, "");
+                print_expr_as_sexp(e->fn_call.args[i], indent);
+            }
+        }
         printf(")");
         break;
     case EXPR_ASSIGN:
