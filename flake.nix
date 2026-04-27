@@ -25,6 +25,7 @@
               cmake
               gcc
               self.formatter.${system}
+              valgrind
             ] ++ lib.optionals (!pkgs.stdenv.hostPlatform.isDarwin) [ pkgs.gdb ];
           };
         }
