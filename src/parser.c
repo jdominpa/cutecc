@@ -776,7 +776,7 @@ Parser parser_init_from_file_path(Arena *a, const char *file_path)
     p.a = a;
 
     // Count amount of tokens
-    Lexer l = lexer_init_from_file_path(file_path);
+    Lexer l = lexer_init_from_file_path(a, file_path);
     Token t = { 0 };
     do {
         t = lexer_next_token(&l);

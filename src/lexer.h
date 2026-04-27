@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "arena.h"
 #include "diag.h"
 
 typedef enum {
@@ -99,7 +100,7 @@ typedef struct {
 } Lexer;
 
 Lexer lexer_init_from_source(const char *file_path, const char *source);
-Lexer lexer_init_from_file_path(const char *file_path);
+Lexer lexer_init_from_file_path(Arena *a, const char *file_path);
 Token lexer_next_token(Lexer *l);
 
 #endif  // LEXER_H_

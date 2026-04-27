@@ -7,6 +7,8 @@
 
 #include "diag.h"
 
+// Accepts a file path and the source code of the file. Returns an initialized
+// lexer.
 Lexer lexer_init_from_source(const char *file_path, const char *source)
 {
     return (Lexer) {
@@ -16,7 +18,9 @@ Lexer lexer_init_from_source(const char *file_path, const char *source)
     };
 }
 
-Lexer lexer_init_from_file_path(const char *file_path)
+// Accepts an arena where the source code of a file will be stored and the file
+// path. Returns the initialized lexer.
+Lexer lexer_init_from_file_path(Arena *a, const char *file_path)
 {
     /* Read file */
     FILE *f = fopen(file_path, "rb");
@@ -25,7 +29,7 @@ Lexer lexer_init_from_file_path(const char *file_path)
     fseek(f, 0, SEEK_END);
     size_t size = ftell(f);
     fseek(f, 0, SEEK_SET);
-    char *source = malloc(size + 1);
+    char *source = arena_alloc_many(a, char, size + 1);
     if (source == NULL)
         diag_fatal("could not allocate memory to read file '%s'", file_path);
     size_t size_read = fread(source, 1, size, f);

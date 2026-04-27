@@ -97,8 +97,10 @@ int main(int argc, char **argv)
         const char *input_file = input_files.items[i];
 
         if (opt_E) {
-            Lexer l = lexer_init_from_file_path(input_file);
+            Arena lexer_arena = arena_init();
+            Lexer l = lexer_init_from_file_path(&lexer_arena, input_file);
             print_tokens(&l);
+            arena_free(&lexer_arena);
             return 0;
         }
 
