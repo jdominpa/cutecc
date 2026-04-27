@@ -321,7 +321,7 @@ static Expr *parse_expr_head(Parser *p)
         Expr *e = arena_alloc(p->a, Expr);
         e->kind = EXPR_NAME;
         e->loc = t.loc;
-        e->name = strndup(t.start, t.len);
+        e->name = arena_strndup(p->a, t.start, t.len);
         return e;
     }
     // TODO: parse character literals
@@ -329,7 +329,7 @@ static Expr *parse_expr_head(Parser *p)
         Expr *e = arena_alloc(p->a, Expr);
         e->kind = EXPR_STR;
         e->loc = t.loc;
-        e->str = strndup(t.start, t.len);
+        e->str = arena_strndup(p->a, t.start, t.len);
         return e;
     }
     case TK_NUM: {
@@ -476,7 +476,7 @@ static Expr *parse_expr_bp(Parser *p, uint8_t min_bp)
             e->kind = op.kind == TK_DOT ? EXPR_FIELD : EXPR_ARROW;
             e->loc = op.loc;
             e->field._struct = obj;
-            e->field.field = strndup(field.start, field.len);
+            e->field.field = arena_strndup(p->a, field.start, field.len);
             continue;
         }
 
