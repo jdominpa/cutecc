@@ -65,6 +65,19 @@ void *arena_alloc_aligned(Arena *a, size_t size, size_t align)
     return ptr;
 }
 
+const char *arena_strndup(Arena *a, const char *str, size_t len)
+{
+    char *copy = arena_alloc_many(a, char, len + 1);
+    memcpy(copy, str, len);
+    copy[len] = '\0';
+    return copy;
+}
+
+const char *arena_strdup(Arena *a, const char *str)
+{
+    return arena_strndup(a, str, strlen(str));
+}
+
 static void arena_free_chunk(Chunk *c)
 {
     free(c->start);

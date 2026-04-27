@@ -19,6 +19,8 @@ typedef struct {
 
 Arena arena_init(void);
 void *arena_alloc_aligned(Arena *a, size_t size, size_t align);
+const char *arena_strndup(Arena *a, const char *str, size_t len);
+const char *arena_strdup(Arena *a, const char *str);
 void arena_reset(Arena *a);
 void arena_free(Arena *a);
 
