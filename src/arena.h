@@ -31,12 +31,4 @@ void arena_free(Arena *a);
          ? (T *) arena_alloc_aligned((a), sizeof(T) * (count), _Alignof(T)) \
          : (abort(), (T *) NULL))
 
-typedef struct {
-    size_t chunk_count;
-    size_t total_size;   /* sum of all chunk sizes */
-    size_t total_offset; /* sum of all chunk offsets */
-} ArenaStats;
-
-ArenaStats arena_stats(const Arena *a);
-
 #endif

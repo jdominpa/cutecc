@@ -117,15 +117,3 @@ void arena_free(Arena *a)
     }
     a->next_chunk_size = 0;
 }
-
-ArenaStats arena_stats(const Arena *a)
-{
-    ArenaStats s = { 0 };
-    assert(a && a->current);
-    for (Chunk *c = a->current; c != NULL; c = c->prev) {
-        s.chunk_count++;
-        s.total_size += c->size;
-        s.total_offset += c->offset;
-    }
-    return s;
-}
