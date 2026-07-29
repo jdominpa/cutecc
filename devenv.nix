@@ -1,0 +1,3 @@
+{
+  languages.c.enable = true;
+}
