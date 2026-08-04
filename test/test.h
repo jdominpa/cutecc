@@ -69,29 +69,30 @@ static TestCtx g_test_ctx = { 0 };
     do {                                                                      \
         fflush(stdout);                                                       \
         fflush(stderr);                                                       \
-        pid_t pid = fork();                                                   \
-        if (pid < 0) {                                                        \
+        pid_t test_pid = fork();                                              \
+        if (test_pid < 0) {                                                   \
             TEST_FAIL("could not fork");                                      \
-        } else if (pid == 0) {                                                \
-            (void) freopen("/dev/null", "w", stderr);                         \
+        } else if (test_pid == 0) {                                           \
+            FILE *test_unused = freopen("/dev/null", "w", stderr);            \
+            (void) test_unused;                                               \
             __VA_ARGS__;                                                      \
             /* Reached only if the body returned instead of exiting. */       \
             _exit(0);                                                         \
         } else {                                                              \
-            int wstatus = 0;                                                  \
-            if (waitpid(pid, &wstatus, 0) < 0)                                \
+            int test_wstatus = 0;                                             \
+            if (waitpid(test_pid, &test_wstatus, 0) < 0)                      \
                 TEST_FAIL("could not wait for child process");                \
-            else if (WIFSIGNALED(wstatus))                                    \
+            else if (WIFSIGNALED(test_wstatus))                               \
                 TEST_FAIL(                                                    \
                     "expected exit(%d) but child process died on signal %d",  \
-                    (status), WTERMSIG(wstatus));                             \
-            else if (!WIFEXITED(wstatus))                                     \
+                    (status), WTERMSIG(test_wstatus));                        \
+            else if (!WIFEXITED(test_wstatus))                                \
                 TEST_FAIL("expected exit(%d) but child process did not exit", \
                           (status));                                          \
-            else if (WEXITSTATUS(wstatus) != (status))                        \
+            else if (WEXITSTATUS(test_wstatus) != (status))                   \
                 TEST_FAIL(                                                    \
                     "expected exit(%d) but child process exited with %d",     \
-                    (status), WEXITSTATUS(wstatus));                          \
+                    (status), WEXITSTATUS(test_wstatus));                     \
         }                                                                     \
     } while (0)
 #endif  // _WIN32

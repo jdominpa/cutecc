@@ -67,7 +67,7 @@ static inline bool is_ident_cont(char c)
     return isalnum(c) || c == '_';
 }
 
-static bool is_keyword(const char *symbol)
+static bool is_keyword(const char *symbol, size_t len)
 {
     const char *keywords[] = {
         "alignas", "alignof", "auto", "bool", "break", "case", "char",
@@ -82,7 +82,7 @@ static bool is_keyword(const char *symbol)
     };
     size_t keyword_count = sizeof(keywords) / sizeof(*keywords);
     for (size_t i = 0; i < keyword_count; ++i)
-        if (strncmp(symbol, keywords[i], strlen(keywords[i])) == 0)
+        if (len == strlen(keywords[i]) && strncmp(symbol, keywords[i], len) == 0)
             return true;
     return false;
 }
@@ -216,7 +216,7 @@ Token lexer_next_token(Lexer *l)
             t.len++;
             lexer_bump(l);
         }
-        if (is_keyword(t.start))
+        if (is_keyword(t.start, t.len))
             t.kind = TK_KW;
         return t;
     }
