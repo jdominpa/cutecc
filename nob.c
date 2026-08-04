@@ -1,31 +1,113 @@
+#include <string.h>
+
 #define NOB_IMPLEMENTATION
+#define NOB_WARN_DEPRECATED
 #include "nob.h"
 
-#define CFLAGS "-Wall", "-Wextra", "-ggdb"
+#define CFLAGS "-Wall", "-Wextra"
 
-#define BUILD_DIR "build/"
-#define SRC_DIR "src/"
+#define BUILD_DIR "./build/"
+#define SRC_DIR "./src/"
+#define TEST_DIR "./test/"
 
-int main(int argc, char **argv)
+static bool build_static_libsimpcc(Cmd *cmd)
 {
-    NOB_GO_REBUILD_URSELF(argc, argv);
-
-    if (!nob_mkdir_if_not_exists(BUILD_DIR)) return 1;
-    Nob_Cmd cmd = { 0 };
-    const char *src_files[] = {
+    const char *lib_files[] = {
         "arena",
         "ast_print",
-        "simpcc",
         "diag",
         "lexer",
         "parser",
     };
 
-    nob_cmd_append(&cmd, "cc", CFLAGS);
-    nob_cmd_append(&cmd, "-o", BUILD_DIR"simpcc");
-    for (size_t i = 0; i < NOB_ARRAY_LEN(src_files); ++i)
-        nob_cmd_append(&cmd, nob_temp_sprintf(SRC_DIR"%s.c", src_files[i]));
+    // Build object files
+    for (size_t i = 0; i < NOB_ARRAY_LEN(lib_files); ++i) {
+        nob_cmd_append(cmd, "cc", "-c", CFLAGS);
+        nob_cmd_append(cmd, "-o", nob_temp_sprintf(BUILD_DIR"%s.o", lib_files[i]));
+        nob_cmd_append(cmd, nob_temp_sprintf(SRC_DIR"%s.c", lib_files[i]));
+        if (!nob_cmd_run(cmd)) return false;
+    }
 
-    if (!nob_cmd_run(&cmd)) return 1;
+    // Build static archive libsimpcc.a
+    nob_cmd_append(cmd, "ar", "rcs");
+    nob_cmd_append(cmd, BUILD_DIR"libsimpcc.a");
+    for (size_t i = 0; i < NOB_ARRAY_LEN(lib_files); ++i)
+        nob_cmd_append(cmd, nob_temp_sprintf(BUILD_DIR"%s.o", lib_files[i]));
+    if (!nob_cmd_run(cmd)) return false;
+
+    return true;
+}
+
+const char *test_files[] = {
+    "lexer",
+};
+
+static bool build_tests(Cmd *cmd)
+{
+    for (size_t i = 0; i < NOB_ARRAY_LEN(test_files); ++i) {
+        nob_cmd_append(cmd, "cc", CFLAGS, "-o",nob_temp_sprintf(BUILD_DIR"test_%s", test_files[i]));
+        nob_cmd_append(cmd, nob_temp_sprintf(TEST_DIR"%s.c", test_files[i]));
+        nob_cmd_append(cmd, BUILD_DIR"libsimpcc.a");
+        if (!nob_cmd_run(cmd)) return false;
+    }
+    return true;
+}
+
+static bool build_simpcc(Cmd *cmd)
+{
+    nob_cmd_append(cmd, "cc", CFLAGS, "-o", BUILD_DIR"simpcc");
+    nob_cmd_append(cmd, SRC_DIR"simpcc.c");
+    nob_cmd_append(cmd, BUILD_DIR"libsimpcc.a");
+    if (!nob_cmd_run(cmd)) return false;
+    return true;
+}
+
+void usage(const char *program)
+{
+    nob_log(NOB_INFO, "Usage: %s [<subcommand>]", program);
+    nob_log(NOB_INFO, "Subcommands:");
+    nob_log(NOB_INFO, "    test");
+    nob_log(NOB_INFO, "        Build and run compiler <tests>.");
+    nob_log(NOB_INFO, "    build");
+    nob_log(NOB_INFO, "        Build the compiler.");
+    nob_log(NOB_INFO, "    run [<args>]");
+    nob_log(NOB_INFO, "        Build and run the compiler.");
+    nob_log(NOB_INFO, "        If <args> is provided the compiler is run with them.");
+}
+
+int main(int argc, char **argv)
+{
+    NOB_GO_REBUILD_URSELF(argc, argv);
+    Nob_Cmd cmd = { 0 };
+
+    if (!nob_mkdir_if_not_exists(BUILD_DIR)) return 1;
+    const char *program = nob_shift_args(&argc, &argv);
+    if (argc == 0) {
+        nob_log(NOB_ERROR, "No subcommand provided");
+        usage(program);
+        return 1;
+    }
+    const char *arg = nob_shift_args(&argc, &argv);
+    if (strcmp(arg, "test") == 0) {
+        if (!build_static_libsimpcc(&cmd)) return 1;
+        if (!build_tests(&cmd)) return 1;
+        for (size_t i = 0; i < NOB_ARRAY_LEN(test_files); ++i) {
+            nob_cmd_append(&cmd, nob_temp_sprintf(BUILD_DIR"test_%s", test_files[i]));
+            if (!nob_cmd_run(&cmd)) return 1;
+        }
+    } else if (strcmp(arg, "build") == 0) {
+        if (!build_static_libsimpcc(&cmd)) return 1;
+        if (!build_simpcc(&cmd)) return 1;
+    } else if (strcmp(arg, "run") == 0) {
+        if (!build_static_libsimpcc(&cmd)) return 1;
+        if (!build_simpcc(&cmd)) return 1;
+        nob_cmd_append(&cmd, BUILD_DIR"simpcc");
+        if (argc > 0) nob_da_append_many(&cmd, argv, argc);
+        if (!nob_cmd_run(&cmd)) return 1;
+    } else {
+        nob_log(NOB_ERROR, "Unknown subcommand `%s`", arg);
+        return 1;
+    }
+
     return 0;
 }
