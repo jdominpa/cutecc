@@ -38,7 +38,7 @@ static bool build_static_libsimpcc(Cmd *cmd)
     return true;
 }
 
-const char *test_files[] = {
+static const char *test_files[] = {
     "lexer",
 };
 
@@ -62,12 +62,12 @@ static bool build_simpcc(Cmd *cmd)
     return true;
 }
 
-void usage(const char *program)
+static void usage(const char *program)
 {
     nob_log(NOB_INFO, "Usage: %s [<subcommand>]", program);
     nob_log(NOB_INFO, "Subcommands:");
     nob_log(NOB_INFO, "    test");
-    nob_log(NOB_INFO, "        Build and run compiler <tests>.");
+    nob_log(NOB_INFO, "        Build and run compiler tests.");
     nob_log(NOB_INFO, "    build");
     nob_log(NOB_INFO, "        Build the compiler.");
     nob_log(NOB_INFO, "    run [<args>]");
@@ -91,10 +91,12 @@ int main(int argc, char **argv)
     if (strcmp(arg, "test") == 0) {
         if (!build_static_libsimpcc(&cmd)) return 1;
         if (!build_tests(&cmd)) return 1;
+        bool err = false;
         for (size_t i = 0; i < NOB_ARRAY_LEN(test_files); ++i) {
             nob_cmd_append(&cmd, nob_temp_sprintf(BUILD_DIR"test_%s", test_files[i]));
-            if (!nob_cmd_run(&cmd)) return 1;
+            if (!nob_cmd_run(&cmd)) err = true;
         }
+        if (err) return 1;
     } else if (strcmp(arg, "build") == 0) {
         if (!build_static_libsimpcc(&cmd)) return 1;
         if (!build_simpcc(&cmd)) return 1;
@@ -106,6 +108,7 @@ int main(int argc, char **argv)
         if (!nob_cmd_run(&cmd)) return 1;
     } else {
         nob_log(NOB_ERROR, "Unknown subcommand `%s`", arg);
+        usage(program);
         return 1;
     }
 

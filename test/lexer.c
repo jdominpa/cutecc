@@ -13,7 +13,7 @@ static void check_next_token(Lexer *l, TokenKind kind, const char *token_text)
            token_kind_to_str[kind], token_kind_to_str[t.kind], (int) t.len,
            t.start, t.loc.line, t.loc.col);
     if (token_text != NULL)
-        ASSERT(t.len == strlen(token_text) && strncmp(t.start, token_text, t.len) == 0,
+        EXPECT(t.len == strlen(token_text) && strncmp(t.start, token_text, t.len) == 0,
                "expected token content `%s` but got `%.*s`", token_text,
                (int) t.len, t.start);
 }
