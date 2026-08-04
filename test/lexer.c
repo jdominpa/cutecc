@@ -22,6 +22,29 @@ static void check_next_token(Lexer *l, TokenKind kind, const char *token_text)
 // Punctuators
 //
 
+DEFINE_TEST(test_whitespace)
+{
+    Lexer l = lexer_init_from_src("   \n\n   ");
+    check_next_token(&l, TK_EOF, NULL);
+}
+
+DEFINE_TEST(test_comments)
+{
+    Lexer l = lexer_init_from_src("/* Test\nblock\n*comment */\n\n// Test inline comment\n// Test inline /* nested comment */");
+    check_next_token(&l, TK_EOF, NULL);
+}
+
+DEFINE_TEST(test_identifiers_and_keywords)
+{
+    Lexer l = lexer_init_from_src("int x y _if enum extern");
+    check_next_token(&l, TK_KW, "int");
+    check_next_token(&l, TK_IDENT, "x");
+    check_next_token(&l, TK_IDENT, "y");
+    check_next_token(&l, TK_IDENT, "_if");
+    check_next_token(&l, TK_KW, "enum");
+    check_next_token(&l, TK_KW, "extern");
+}
+
 DEFINE_TEST(test_single_char_punctuators)
 {
     Lexer l = lexer_init_from_src("(){}[];:,.");
@@ -40,6 +63,9 @@ DEFINE_TEST(test_single_char_punctuators)
 
 int main(void)
 {
+    RUN_TEST(test_whitespace);
+    RUN_TEST(test_comments);
+    RUN_TEST(test_identifiers_and_keywords);
     RUN_TEST(test_single_char_punctuators);
     TEST_SUMMARY();
     return 0;
