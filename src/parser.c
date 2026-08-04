@@ -817,7 +817,7 @@ static Stmt *parse_stmt(Parser *p)
 // Translation unit parser
 //
 
-static Parser parser_init_from_lexer(Arena *a, Lexer l)
+Parser parser_init_from_lexer(Arena *a, Lexer l)
 {
     Parser p = { 0 };
     p.a = a;
