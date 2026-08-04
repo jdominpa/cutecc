@@ -10,8 +10,31 @@
 #define SRC_DIR "./src/"
 #define TEST_DIR "./test/"
 
+// Appends every header in SRC_DIR to `headers`. Nothing here tracks which
+// translation unit includes which header, so a change to any of them rebuilds
+// everything. We should switch to `cc -MMD` dep files if the full rebuild ever
+// becomes noticeable.
+static bool collect_src_headers(Nob_File_Paths *headers)
+{
+    bool result = true;
+    Nob_File_Paths entries = { 0 };
+
+    if (!nob_read_entire_dir(SRC_DIR, &entries)) nob_return_defer(false);
+    for (size_t i = 0; i < entries.count; ++i) {
+        const char *entry = entries.items[i];
+        size_t len = strlen(entry);
+        if (len > 2 && strcmp(entry + len - 2, ".h") == 0)
+            nob_da_append(headers, nob_temp_sprintf(SRC_DIR"%s", entry));
+    }
+
+defer:
+    nob_da_free(entries);
+    return result;
+}
+
 static bool build_static_libsimpcc(Cmd *cmd)
 {
+    bool result = true;
     const char *lib_files[] = {
         "arena",
         "ast_print",
@@ -19,34 +42,49 @@ static bool build_static_libsimpcc(Cmd *cmd)
         "lexer",
         "parser",
     };
-    const size_t files_count = NOB_ARRAY_LEN(lib_files);
+    const char *obj_files[NOB_ARRAY_LEN(lib_files)];
+    Nob_File_Paths headers = { 0 };
+    Nob_File_Paths inputs = { 0 };
+    int rebuild;
+
+    if (!collect_src_headers(&headers)) nob_return_defer(false);
 
     // Build object files
-    for (size_t i = 0; i < files_count; ++i) {
+    for (size_t i = 0; i < NOB_ARRAY_LEN(lib_files); ++i) {
         const char *input_lib_file = nob_temp_sprintf(SRC_DIR"%s.c", lib_files[i]);
-        const char *output_obj_file = nob_temp_sprintf(BUILD_DIR"%s.o", lib_files[i]);
-        if (nob_needs_rebuild1(output_obj_file, input_lib_file)) {
+        obj_files[i] = nob_temp_sprintf(BUILD_DIR"%s.o", lib_files[i]);
+
+        inputs.count = 0;
+        nob_da_append(&inputs, input_lib_file);
+        nob_da_append_many(&inputs, headers.items, headers.count);
+
+        rebuild = nob_needs_rebuild(obj_files[i], inputs.items, inputs.count);
+        if (rebuild < 0) nob_return_defer(false);
+        if (rebuild > 0) {
             nob_cmd_append(cmd, "cc", "-c", CFLAGS);
-            nob_cmd_append(cmd, "-o", output_obj_file);
+            nob_cmd_append(cmd, "-o", obj_files[i]);
             nob_cmd_append(cmd, input_lib_file);
-            if (!nob_cmd_run(cmd)) return false;
+            if (!nob_cmd_run(cmd)) nob_return_defer(false);
         }
     }
 
     // Build static archive libsimpcc.a
-    const char *obj_files[files_count];
-    for (size_t i = 0; i < files_count; ++i)
-        obj_files[i] = nob_temp_sprintf(BUILD_DIR"%s.o", lib_files[i]);
-    if (nob_needs_rebuild(BUILD_DIR"libsimpcc.a", obj_files, files_count)) {
-        if (!nob_delete_file(BUILD_DIR"libsimpcc.a")) return false;
-        nob_cmd_append(cmd, "ar", "rcs");
-        nob_cmd_append(cmd, BUILD_DIR"libsimpcc.a");
-        for (size_t i = 0; i < files_count; ++i)
-            nob_cmd_append(cmd, nob_temp_sprintf(BUILD_DIR"%s.o", lib_files[i]));
-        if (!nob_cmd_run(cmd)) return false;
+    rebuild = nob_needs_rebuild(BUILD_DIR"libsimpcc.a", obj_files,
+                                NOB_ARRAY_LEN(lib_files));
+    if (rebuild < 0) nob_return_defer(false);
+    if (rebuild > 0) {
+        if (nob_file_exists(BUILD_DIR "libsimpcc.a") &&
+            !nob_delete_file(BUILD_DIR "libsimpcc.a"))
+            nob_return_defer(false);
+        nob_cmd_append(cmd, "ar", "rcs", BUILD_DIR"libsimpcc.a");
+        nob_da_append_many(cmd, obj_files, NOB_ARRAY_LEN(lib_files));
+        if (!nob_cmd_run(cmd)) nob_return_defer(false);
     }
 
-    return true;
+defer:
+    nob_da_free(headers);
+    nob_da_free(inputs);
+    return result;
 }
 
 static const char *test_files[] = {
@@ -55,38 +93,62 @@ static const char *test_files[] = {
 
 static bool build_tests(Cmd *cmd)
 {
+    bool result = true;
+    Nob_File_Paths headers = { 0 };
+    Nob_File_Paths inputs = { 0 };
+
+    if (!collect_src_headers(&headers)) nob_return_defer(false);
+
     for (size_t i = 0; i < NOB_ARRAY_LEN(test_files); ++i) {
         const char *test_bin = nob_temp_sprintf(BUILD_DIR"test_%s", test_files[i]);
         const char *input_test_file = nob_temp_sprintf(TEST_DIR"%s.c", test_files[i]);
-        if (nob_needs_rebuild(test_bin,
-                              (const char *[]) {
-                                  input_test_file,
-                                  BUILD_DIR "libsimpcc.a",
-                              },
-                              2)) {
+
+        inputs.count = 0;
+        nob_da_append(&inputs, input_test_file);
+        nob_da_append(&inputs, TEST_DIR"test.h");
+        nob_da_append_many(&inputs, headers.items, headers.count);
+        nob_da_append(&inputs, BUILD_DIR"libsimpcc.a");
+
+        int rebuild = nob_needs_rebuild(test_bin, inputs.items, inputs.count);
+        if (rebuild < 0) nob_return_defer(false);
+        if (rebuild > 0) {
             nob_cmd_append(cmd, "cc", CFLAGS, "-o", test_bin);
             nob_cmd_append(cmd, input_test_file);
             nob_cmd_append(cmd, BUILD_DIR"libsimpcc.a");
-            if (!nob_cmd_run(cmd)) return false;
+            if (!nob_cmd_run(cmd)) nob_return_defer(false);
         }
     }
-    return true;
+
+defer:
+    nob_da_free(headers);
+    nob_da_free(inputs);
+    return result;
 }
 
 static bool build_simpcc(Cmd *cmd)
 {
-    if (nob_needs_rebuild(BUILD_DIR "simpcc",
-                          (const char *[]) {
-                              SRC_DIR "simpcc.c",
-                              BUILD_DIR "libsimpcc.a",
-                          },
-                          2)) {
+    bool result = true;
+    Nob_File_Paths headers = { 0 };
+    Nob_File_Paths inputs = { 0 };
+
+    if (!collect_src_headers(&headers)) nob_return_defer(false);
+    nob_da_append(&inputs, SRC_DIR"simpcc.c");
+    nob_da_append_many(&inputs, headers.items, headers.count);
+    nob_da_append(&inputs, BUILD_DIR"libsimpcc.a");
+
+    int rebuild = nob_needs_rebuild(BUILD_DIR"simpcc", inputs.items, inputs.count);
+    if (rebuild < 0) nob_return_defer(false);
+    if (rebuild > 0) {
         nob_cmd_append(cmd, "cc", CFLAGS, "-o", BUILD_DIR"simpcc");
         nob_cmd_append(cmd, SRC_DIR"simpcc.c");
         nob_cmd_append(cmd, BUILD_DIR"libsimpcc.a");
-        if (!nob_cmd_run(cmd)) return false;
+        if (!nob_cmd_run(cmd)) nob_return_defer(false);
     }
-    return true;
+
+defer:
+    nob_da_free(headers);
+    nob_da_free(inputs);
+    return result;
 }
 
 static void usage(const char *program)
