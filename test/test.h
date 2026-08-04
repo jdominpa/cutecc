@@ -51,6 +51,51 @@ static TestCtx g_test_ctx = { 0 };
         }                                      \
     } while (0)
 
+// Runs `...` in a forked child and checks that it terminated by calling exit()
+// with `status`. Needed for code paths that end the process instead of
+// returning (e.g. diag_fatal_at()) which cannot be exercised in-process. The
+// child's stderr is discarded so the expected diagnostic does not clutter the
+// test output.
+//
+// POSIX only. Windows has no fork(); these checks would need CreateProcess and
+// a way to re-enter the binary at a single test, so they are simply skipped
+// there rather than faked.
+#ifndef _WIN32
+#include <unistd.h>
+
+#include <sys/wait.h>
+
+#define EXPECT_EXIT(status, ...)                                              \
+    do {                                                                      \
+        fflush(stdout);                                                       \
+        fflush(stderr);                                                       \
+        pid_t pid = fork();                                                   \
+        if (pid < 0) {                                                        \
+            TEST_FAIL("could not fork");                                      \
+        } else if (pid == 0) {                                                \
+            (void) freopen("/dev/null", "w", stderr);                         \
+            __VA_ARGS__;                                                      \
+            /* Reached only if the body returned instead of exiting. */       \
+            _exit(0);                                                         \
+        } else {                                                              \
+            int wstatus = 0;                                                  \
+            if (waitpid(pid, &wstatus, 0) < 0)                                \
+                TEST_FAIL("could not wait for child process");                \
+            else if (WIFSIGNALED(wstatus))                                    \
+                TEST_FAIL(                                                    \
+                    "expected exit(%d) but child process died on signal %d",  \
+                    (status), WTERMSIG(wstatus));                             \
+            else if (!WIFEXITED(wstatus))                                     \
+                TEST_FAIL("expected exit(%d) but child process did not exit", \
+                          (status));                                          \
+            else if (WEXITSTATUS(wstatus) != (status))                        \
+                TEST_FAIL(                                                    \
+                    "expected exit(%d) but child process exited with %d",     \
+                    (status), WEXITSTATUS(wstatus));                          \
+        }                                                                     \
+    } while (0)
+#endif  // _WIN32
+
 #define TEST_SUMMARY()                                                 \
     do {                                                               \
         fprintf(stderr, "\n%d passed, %d failed\n", g_test_ctx.passed, \
