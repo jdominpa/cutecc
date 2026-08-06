@@ -1,17 +1,11 @@
 #include "ast_print.h"
 
-#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include "ast.h"
 #include "common.h"
 
 #define INDENT_WIDTH 2
-
-static inline void print_loc(FILE *out, Loc loc)
-{
-    fprintf(out, "<%zu:%zu>", loc.line, loc.col);
-}
 
 static const char *unop_kind_to_str(UnopKind kind)
 {
@@ -128,36 +122,68 @@ const char *type_to_str(Type ty)
     }
 }
 
-static void print_type_field(FILE *out, const char *label, const Type ty, uint32_t depth)
+typedef struct {
+    FILE *out;
+    uint32_t depth;
+    bool compact;
+    bool print_locs;
+} PrintCtx;
+
+static inline void print_loc(PrintCtx *ctx, Loc loc)
 {
-    fprintf(out, "\n");
-    fprintf(out, "%*s", depth * INDENT_WIDTH, "");
-    if (label != NULL)
-        fprintf(out, "%s: ", label);
-    print_type(out, ty, depth);
+    if (ctx->print_locs)
+        fprintf(ctx->out, "<%zu:%zu>", loc.line, loc.col);
 }
 
-static void print_expr_field(FILE *out, const char *label, const Expr *e, uint32_t depth)
+static void print_type_ctx(PrintCtx *ctx, const Type ty);
+static void print_expr_ctx(PrintCtx *ctx, const Expr *e);
+static void print_stmt_ctx(PrintCtx *ctx, const Stmt *s);
+
+static void print_type_field(PrintCtx *ctx, const char *label, const Type ty)
 {
-    fprintf(out, "\n");
-    fprintf(out, "%*s", depth * INDENT_WIDTH, "");
-    if (label != NULL)
-        fprintf(out, "%s: ", label);
-    print_expr(out, e, depth);
+    if (ctx->compact) {
+        fprintf(ctx->out, " ");
+    } else {
+        fprintf(ctx->out, "\n%*s", (ctx->depth + 1) * INDENT_WIDTH, "");
+        if (label != NULL)
+            fprintf(ctx->out, "%s: ", label);
+    }
+    ctx->depth++;
+    print_type_ctx(ctx, ty);
+    ctx->depth--;
 }
 
-static void print_stmt_field(FILE *out, const char *label, const Stmt *s, uint32_t depth)
+static void print_expr_field(PrintCtx *ctx, const char *label, const Expr *e)
 {
-    fprintf(out, "\n");
-    fprintf(out, "%*s", depth * INDENT_WIDTH, "");
-    if (label != NULL)
-        fprintf(out, "%s: ", label);
-    print_stmt(out, s, depth);
+    if (ctx->compact) {
+        fprintf(ctx->out, " ");
+    } else {
+        fprintf(ctx->out, "\n%*s", (ctx->depth + 1) * INDENT_WIDTH, "");
+        if (label != NULL)
+            fprintf(ctx->out, "%s: ", label);
+    }
+    ctx->depth++;
+    print_expr_ctx(ctx, e);
+    ctx->depth--;
+}
+
+static void print_stmt_field(PrintCtx *ctx, const char *label, const Stmt *s)
+{
+    if (ctx->compact) {
+        fprintf(ctx->out, " ");
+    } else {
+        fprintf(ctx->out, "\n%*s", (ctx->depth + 1) * INDENT_WIDTH, "");
+        if (label != NULL)
+            fprintf(ctx->out, "%s: ", label);
+    }
+    ctx->depth++;
+    print_stmt_ctx(ctx, s);
+    ctx->depth--;
 }
 
 // TODO: implement types TYPE_ENUM, TYPE_FUNC, TYPE_VLA, TYPE_STRUCT,
 // TYPE_UNION, TYPE_NAMED
-void print_type(FILE *out, const Type ty, uint32_t depth)
+static void print_type_ctx(PrintCtx *ctx, const Type ty)
 {
     switch (ty.kind) {
     case TYPE_VOID:
@@ -169,201 +195,267 @@ void print_type(FILE *out, const Type ty, uint32_t depth)
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
     case TYPE_LDOUBLE:
-        fprintf(out, "(type ");
-        print_loc(out, ty.loc);
-        fprintf(out, " %s)", type_to_str(ty));
+        fprintf(ctx->out, "(type ");
+        print_loc(ctx, ty.loc);
+        fprintf(ctx->out, " %s)", type_to_str(ty));
         break;
     case TYPE_PTR:
-        fprintf(out, "(ptr_type ");
-        print_loc(out, ty.loc);
-        print_type_field(out, "base", *ty.ptr.base, depth + 1);
-        fprintf(out, ")");
+        fprintf(ctx->out, "(ptr_type ");
+        print_loc(ctx, ty.loc);
+        print_type_field(ctx, "base", *ty.ptr.base);
+        fprintf(ctx->out, ")");
         break;
     case TYPE_ARRAY:
-        fprintf(out, "(array_type[%zu] ", ty.array.size);
-        print_loc(out, ty.loc);
-        print_type_field(out, "base", *ty.array.base, depth + 1);
-        fprintf(out, ")");
+        fprintf(ctx->out, "(array_type[%zu] ", ty.array.size);
+        print_loc(ctx, ty.loc);
+        print_type_field(ctx, "base", *ty.array.base);
+        fprintf(ctx->out, ")");
         break;
     default:
         UNREACHABLE("print_type");
     }
 }
 
-void print_expr(FILE *out, const Expr *e, uint32_t depth)
+static void print_expr_ctx(PrintCtx *ctx, const Expr *e)
 {
     if (e == NULL) {
-        fprintf(out, "(expr null)");
+        fprintf(ctx->out, "(expr null)");
         return;
     }
 
     switch (e->kind) {
     case EXPR_CHAR:
-        fprintf(out, "(char_literal ");
-        print_loc(out, e->loc);
-        fprintf(out, " '%c')", e->c);
+        fprintf(ctx->out, "(char_literal ");
+        print_loc(ctx, e->loc);
+        fprintf(ctx->out, " '%c')", e->c);
         break;
     case EXPR_STR:
-        fprintf(out, "(string_literal ");
-        print_loc(out, e->loc);
+        fprintf(ctx->out, "(string_literal ");
+        print_loc(ctx, e->loc);
         // NOTE: `e->str` already contains the enclosing double quotes, we don't
         // need to add them here
-        fprintf(out, " %s)", e->str);
+        fprintf(ctx->out, " %s)", e->str);
         break;
     case EXPR_NUM:
-        fprintf(out, "(number_literal ");
-        print_loc(out, e->loc);
-        fprintf(out, " %d)", e->val);
+        fprintf(ctx->out, "(number_literal ");
+        print_loc(ctx, e->loc);
+        fprintf(ctx->out, " %d)", e->val);
         break;
     case EXPR_IDENT:
-        fprintf(out, "(identifier ");
-        print_loc(out, e->loc);
-        fprintf(out, " %s)", e->ident);
+        fprintf(ctx->out, "(identifier ");
+        print_loc(ctx, e->loc);
+        fprintf(ctx->out, " %s)", e->ident);
         break;
     case EXPR_UNOP:
-        fprintf(out, "(unary_expr ");
-        print_loc(out, e->loc);
-        fprintf(out, " %s", unop_kind_to_str(e->unop.kind));
-        print_expr_field(out, "operand", e->unop.operand, depth + 1);
-        fprintf(out, ")");
+        fprintf(ctx->out, "(unary_expr ");
+        print_loc(ctx, e->loc);
+        fprintf(ctx->out, " %s", unop_kind_to_str(e->unop.kind));
+        print_expr_field(ctx, "operand", e->unop.operand);
+        fprintf(ctx->out, ")");
         break;
     case EXPR_BINOP:
-        fprintf(out, "(binary_expr ");
-        print_loc(out, e->loc);
-        fprintf(out, " %s", binop_kind_to_str(e->binop.kind));
-        print_expr_field(out, "lhs", e->binop.lhs, depth + 1);
-        print_expr_field(out, "rhs", e->binop.rhs, depth + 1);
-        fprintf(out, ")");
+        fprintf(ctx->out, "(binary_expr ");
+        print_loc(ctx, e->loc);
+        fprintf(ctx->out, " %s", binop_kind_to_str(e->binop.kind));
+        print_expr_field(ctx, "lhs", e->binop.lhs);
+        print_expr_field(ctx, "rhs", e->binop.rhs);
+        fprintf(ctx->out, ")");
         break;
     case EXPR_TERNOP:
-        fprintf(out, "(ternary_expr ");
-        print_loc(out, e->loc);
-        print_expr_field(out, "cond", e->ternop.cond, depth + 1);
-        print_expr_field(out, "then", e->ternop.then, depth + 1);
-        print_expr_field(out, "else", e->ternop._else, depth + 1);
-        fprintf(out, ")");
+        fprintf(ctx->out, "(ternary_expr ");
+        print_loc(ctx, e->loc);
+        print_expr_field(ctx, "cond", e->ternop.cond);
+        print_expr_field(ctx, "then", e->ternop.then);
+        print_expr_field(ctx, "else", e->ternop._else);
+        fprintf(ctx->out, ")");
         break;
     case EXPR_FN_CALL:
-        fprintf(out, "(fn_call_expr ");
-        print_loc(out, e->loc);
-        fprintf(out, " %s", e->fn_call.fn_name);
+        fprintf(ctx->out, "(fn_call_expr ");
+        print_loc(ctx, e->loc);
+        fprintf(ctx->out, " %s", e->fn_call.fn_name);
         for (size_t i = 0; i < e->fn_call.argc; ++i) {
             char arg_label[50];
             sprintf(arg_label, "arg %zu", i);
-            print_expr_field(out, arg_label, e->fn_call.args[i], depth + 1);
+            print_expr_field(ctx, arg_label, e->fn_call.args[i]);
         }
-        fprintf(out, ")");
+        fprintf(ctx->out, ")");
         break;
     case EXPR_ASSIGN:
-        fprintf(out, "(assign_expr ");
-        print_loc(out, e->loc);
-        fprintf(out, " %s", assign_kind_to_str(e->assign.kind));
-        print_expr_field(out, "var", e->assign.var, depth + 1);
-        print_expr_field(out, "value", e->assign.value, depth + 1);
-        fprintf(out, ")");
+        fprintf(ctx->out, "(assign_expr ");
+        print_loc(ctx, e->loc);
+        fprintf(ctx->out, " %s", assign_kind_to_str(e->assign.kind));
+        print_expr_field(ctx, "var", e->assign.var);
+        print_expr_field(ctx, "value", e->assign.value);
+        fprintf(ctx->out, ")");
         break;
     case EXPR_INDEX:
-        fprintf(out, "(subscript_expr ");
-        print_loc(out, e->loc);
-        print_expr_field(out, "array", e->index.array, depth + 1);
-        print_expr_field(out, "index", e->index.index, depth + 1);
-        fprintf(out, ")");
+        fprintf(ctx->out, "(subscript_expr ");
+        print_loc(ctx, e->loc);
+        print_expr_field(ctx, "array", e->index.array);
+        print_expr_field(ctx, "index", e->index.index);
+        fprintf(ctx->out, ")");
         break;
     case EXPR_FIELD:
-        fprintf(out, "(field_expr ");
-        print_loc(out, e->loc);
-        fprintf(out, " %s", e->field.field);
-        print_expr_field(out, "obj", e->field._struct, depth + 1);
-        fprintf(out, ")");
+        fprintf(ctx->out, "(field_expr ");
+        print_loc(ctx, e->loc);
+        fprintf(ctx->out, " %s", e->field.field);
+        print_expr_field(ctx, "obj", e->field._struct);
+        fprintf(ctx->out, ")");
         break;
     case EXPR_ARROW:
-        fprintf(out, "(arrow_expr ");
-        print_loc(out, e->loc);
-        fprintf(out, " %s", e->field.field);
-        print_expr_field(out, "obj", e->field._struct, depth + 1);
-        fprintf(out, ")");
+        fprintf(ctx->out, "(arrow_expr ");
+        print_loc(ctx, e->loc);
+        fprintf(ctx->out, " %s", e->field.field);
+        print_expr_field(ctx, "obj", e->field._struct);
+        fprintf(ctx->out, ")");
         break;
     case EXPR_CAST:
-        fprintf(out, "(cast_expr ");
-        print_loc(out, e->loc);
-        print_type_field(out, "type", e->cast.type, depth + 1);
-        print_expr_field(out, "expr", e->cast.expr, depth + 1);
-        fprintf(out, ")");
+        fprintf(ctx->out, "(cast_expr ");
+        print_loc(ctx, e->loc);
+        print_type_field(ctx, "type", e->cast.type);
+        print_expr_field(ctx, "expr", e->cast.expr);
+        fprintf(ctx->out, ")");
         break;
     case EXPR_SIZEOF_TY:
-        fprintf(out, "(sizeof_type_expr ");
-        print_loc(out, e->loc);
-        print_type_field(out, "type", e->sizeof_ty, depth + 1);
-        fprintf(out, ")");
+        fprintf(ctx->out, "(sizeof_type_expr ");
+        print_loc(ctx, e->loc);
+        print_type_field(ctx, "type", e->sizeof_ty);
+        fprintf(ctx->out, ")");
         break;
     case EXPR_SIZEOF_EX:
-        fprintf(out, "(sizeof_value_expr ");
-        print_loc(out, e->loc);
-        print_expr_field(out, "expr", e->sizeof_expr, depth + 1);
-        fprintf(out, ")");
+        fprintf(ctx->out, "(sizeof_value_expr ");
+        print_loc(ctx, e->loc);
+        print_expr_field(ctx, "expr", e->sizeof_expr);
+        fprintf(ctx->out, ")");
         break;
     case EXPR_ALIGNOF:
-        fprintf(out, "(alignof_expr ");
-        print_loc(out, e->loc);
-        print_type_field(out, "type", e->alignof_ty, depth + 1);
-        fprintf(out, ")");
+        fprintf(ctx->out, "(alignof_expr ");
+        print_loc(ctx, e->loc);
+        print_type_field(ctx, "type", e->alignof_ty);
+        fprintf(ctx->out, ")");
         break;
     default:
         UNREACHABLE("print_expr_as_sexp");
     }
 }
 
-void print_stmt(FILE *out, const Stmt *s, uint32_t depth)
+static void print_stmt_ctx(PrintCtx *ctx, const Stmt *s)
 {
     if (s == NULL) {
-        fprintf(out, "(stmt null)");
+        fprintf(ctx->out, "(stmt null)");
         return;
     }
 
     switch (s->kind) {
     case STMT_BLOCK:
-        fprintf(out, "(block_stmt ");
-        print_loc(out, s->loc);
+        fprintf(ctx->out, "(block_stmt ");
+        print_loc(ctx, s->loc);
         for (size_t i = 0; i < s->block.count; ++i) {
             char stmt_label[50];
             sprintf(stmt_label, "statement %zu", i);
-            print_stmt_field(out, stmt_label, s->block.stmts[i], depth + 1);
+            print_stmt_field(ctx, stmt_label, s->block.stmts[i]);
         }
-        fprintf(out, ")");
+        fprintf(ctx->out, ")");
         break;
     case STMT_IF:
-        fprintf(out, "(if_stmt ");
-        print_loc(out, s->loc);
-        print_expr_field(out, "condition", s->_if.cond, depth + 1);
-        print_stmt_field(out, "then", s->_if.then, depth + 1);
+        fprintf(ctx->out, "(if_stmt ");
+        print_loc(ctx, s->loc);
+        print_expr_field(ctx, "condition", s->_if.cond);
+        print_stmt_field(ctx, "then", s->_if.then);
         if (s->_if._else != NULL)
-            print_stmt_field(out, "else", s->_if._else, depth + 1);
-        fprintf(out, ")");
+            print_stmt_field(ctx, "else", s->_if._else);
+        fprintf(ctx->out, ")");
         break;
     // Jump statements
     case STMT_BREAK:
-        fprintf(out, "(break_stmt ");
-        print_loc(out, s->loc);
-        fprintf(out, ")");
+        fprintf(ctx->out, "(break_stmt ");
+        print_loc(ctx, s->loc);
+        fprintf(ctx->out, ")");
         break;
     case STMT_CONT:
-        fprintf(out, "(continue_stmt ");
-        print_loc(out, s->loc);
-        fprintf(out, ")");
+        fprintf(ctx->out, "(continue_stmt ");
+        print_loc(ctx, s->loc);
+        fprintf(ctx->out, ")");
         break;
     case STMT_GOTO:
-        fprintf(out, "(goto_stmt ");
-        print_loc(out, s->loc);
-        fprintf(out, " %s)", s->goto_label);
+        fprintf(ctx->out, "(goto_stmt ");
+        print_loc(ctx, s->loc);
+        fprintf(ctx->out, " %s)", s->goto_label);
         break;
     case STMT_RET:
-        fprintf(out, "(return_stmt ");
-        print_loc(out, s->loc);
+        fprintf(ctx->out, "(return_stmt ");
+        print_loc(ctx, s->loc);
         if (s->_return != NULL)
-            print_expr_field(out, "expr", s->_return, depth + 1);
-        fprintf(out, ")");
+            print_expr_field(ctx, "expr", s->_return);
+        fprintf(ctx->out, ")");
         break;
     default:
         UNREACHABLE("print_stmt");
     }
+}
+
+void print_type(FILE *out, const Type ty, uint32_t depth)
+{
+    PrintCtx ctx = {
+        .out = out,
+        .depth = depth,
+        .compact = false,
+        .print_locs = true,
+    };
+    print_type_ctx(&ctx, ty);
+}
+
+void print_type_compact(FILE *out, const Type ty)
+{
+    PrintCtx ctx = {
+        .out = out,
+        .depth = 0,
+        .compact = true,
+        .print_locs = false,
+    };
+    print_type_ctx(&ctx, ty);
+}
+
+void print_expr(FILE *out, const Expr *e, uint32_t depth)
+{
+    PrintCtx ctx = {
+        .out = out,
+        .depth = depth,
+        .compact = false,
+        .print_locs = true,
+    };
+    print_expr_ctx(&ctx, e);
+}
+
+void print_expr_compact(FILE *out, const Expr *e)
+{
+    PrintCtx ctx = {
+        .out = out,
+        .depth = 0,
+        .compact = true,
+        .print_locs = false,
+    };
+    print_expr_ctx(&ctx, e);
+}
+
+void print_stmt_compact(FILE *out, const Stmt *s)
+{
+    PrintCtx ctx = {
+        .out = out,
+        .depth = 0,
+        .compact = true,
+        .print_locs = false,
+    };
+    print_stmt_ctx(&ctx, s);
+}
+
+void print_stmt(FILE *out, const Stmt *s, uint32_t depth)
+{
+    PrintCtx ctx = {
+        .out = out,
+        .depth = depth,
+        .compact = false,
+        .print_locs = true,
+    };
+    print_stmt_ctx(&ctx, s);
 }
