@@ -120,7 +120,7 @@ static bool is_castable_type(Type ty)
 
 // TODO: implement types TYPE_ENUM, TYPE_FUNC, TYPE_ARRAY, TYPE_VLA,
 // TYPE_STRUCT, TYPE_UNION, TYPE_NAMED
-static Type parse_type(Parser *p)
+Type parse_type(Parser *p)
 {
     if (parser_at_eof(p))
         diag_fatal_at(parser_peek(p).loc, "unexpected end of file encountered while parsing type");
@@ -412,7 +412,6 @@ static inline uint8_t get_prefix_op_bp(void)
     return get_op_bp(TK_MINUS_MINUS).left;
 }
 
-static Expr *parse_expr(Parser *p);
 static Expr *parse_expr_bp(Parser *p, uint8_t min_bp);
 
 // Parses and returns the arguments in a function call while storing the
@@ -708,7 +707,7 @@ static Expr *parse_expr_bp(Parser *p, uint8_t min_bp)
 
 // Wrapper function for `parse_expr_bp` with the minimum binding power set to
 // the lowest binding power of any operation.
-static inline Expr *parse_expr(Parser *p)
+inline Expr *parse_expr(Parser *p)
 {
     // NOTE: minimum binding power of any operation is 1. The binding power of
     // any other token kind is 0.
@@ -718,8 +717,6 @@ static inline Expr *parse_expr(Parser *p)
 //
 // Statement parser
 //
-
-static Stmt *parse_stmt(Parser *p);
 
 static Stmt *parse_block_stmts(Parser *p)
 {
@@ -754,7 +751,7 @@ static Stmt *parse_block_stmts(Parser *p)
     return s;
 }
 
-static Stmt *parse_stmt(Parser *p)
+Stmt *parse_stmt(Parser *p)
 {
     Token t = parser_peek(p);
     parser_bump(p);
@@ -848,11 +845,8 @@ inline Parser parser_init_from_file_path(Arena *a, const char *file_path)
     return parser_init_from_lexer(a, lexer_init_from_file_path(a, file_path));
 }
 
-void parse_transl_unit(Parser *p)
+TranslUnit parse_transl_unit(Parser *p)
 {
-    /* Expr *e = parse_expr(p); */
-    /* print_expr(stdout, e, 0); */
-    Stmt *s = parse_stmt(p);
-    print_stmt(stdout, s, 0);
-    printf("\n");
+    TranslUnit tl;
+    return tl;
 }
