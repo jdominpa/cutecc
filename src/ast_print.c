@@ -1,5 +1,6 @@
 #include "ast_print.h"
 
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 #include "ast.h"
@@ -9,60 +10,64 @@
 
 static const char *unop_kind_to_str(UnopKind kind)
 {
+    static_assert(UNOP_COUNT == 10, "unop_kind_to_str: `UNOP_COUNT` value has changed");
     switch (kind) {
-    case UNOP_POS: return "+";
-    case UNOP_NEG: return "-";
-    case UNOP_NOT: return "!";
-    case UNOP_BIT_NOT: return "~";
-    case UNOP_DEREF: return "*";
-    case UNOP_ADDR: return "&";
-    case UNOP_PRE_INC: return "++ (pre)";
-    case UNOP_PRE_DEC: return "-- (pre)";
+    case UNOP_POS:      return "+";
+    case UNOP_NEG:      return "-";
+    case UNOP_NOT:      return "!";
+    case UNOP_BIT_NOT:  return "~";
+    case UNOP_DEREF:    return "*";
+    case UNOP_ADDR:     return "&";
+    case UNOP_PRE_INC:  return "++ (pre)";
+    case UNOP_PRE_DEC:  return "-- (pre)";
     case UNOP_POST_INC: return "++ (post)";
     case UNOP_POST_DEC: return "-- (post)";
-    default: UNREACHABLE("unop_to_str");
+    default: UNREACHABLE("unop_kind_to_str");
     }
 }
 
 static const char *binop_kind_to_str(BinopKind kind)
 {
+    static_assert(BINOP_COUNT == 19, "binop_kind_to_str: `BINOP_COUNT` value has changed");
     switch (kind) {
-    case BINOP_OR: return "||";
-    case BINOP_AND: return "&&";
-    case BINOP_BIT_OR: return "|";
+    case BINOP_COMMA:   return ",";
+    case BINOP_OR:      return "||";
+    case BINOP_AND:     return "&&";
+    case BINOP_BIT_OR:  return "|";
     case BINOP_BIT_XOR: return "^";
     case BINOP_BIT_AND: return "&";
-    case BINOP_EQ: return "==";
-    case BINOP_NOT_EQ: return "!=";
-    case BINOP_LT: return "<";
-    case BINOP_LT_EQ: return "<=";
-    case BINOP_GT: return ">";
-    case BINOP_GT_EQ: return ">=";
-    case BINOP_LSFT: return "<<";
-    case BINOP_RSFT: return ">>";
-    case BINOP_PLUS: return "+";
-    case BINOP_MINUS: return "-";
-    case BINOP_MULT: return "*";
-    case BINOP_DIV: return "/";
-    case BINOP_MOD: return "%";
+    case BINOP_EQ:      return "==";
+    case BINOP_NOT_EQ:  return "!=";
+    case BINOP_LT:      return "<";
+    case BINOP_LT_EQ:   return "<=";
+    case BINOP_GT:      return ">";
+    case BINOP_GT_EQ:   return ">=";
+    case BINOP_LSFT:    return "<<";
+    case BINOP_RSFT:    return ">>";
+    case BINOP_PLUS:    return "+";
+    case BINOP_MINUS:   return "-";
+    case BINOP_MULT:    return "*";
+    case BINOP_DIV:     return "/";
+    case BINOP_MOD:     return "%";
     default: UNREACHABLE("binop_kind_to_str");
     }
 }
 
 static const char *assign_kind_to_str(AssignKind kind)
 {
+    static_assert(ASSIGN_COUNT == 11, "assign_kind_to_str: `ASSIGN_COUNT` value has changed");
     switch (kind) {
-    case ASSIGN_AND: return "&=";
-    case ASSIGN_XOR: return "^=";
-    case ASSIGN_OR: return "|=";
-    case ASSIGN_LSFT: return "<<=";
-    case ASSIGN_RSFT: return ">>=";
-    case ASSIGN_MULT: return "*=";
-    case ASSIGN_DIV: return "/=";
-    case ASSIGN_MOD: return "%=";
-    case ASSIGN_PLUS: return "+=";
+    case ASSIGN_AND:   return "&=";
+    case ASSIGN_XOR:   return "^=";
+    case ASSIGN_OR:    return "|=";
+    case ASSIGN_LSFT:  return "<<=";
+    case ASSIGN_RSFT:  return ">>=";
+    case ASSIGN_MULT:  return "*=";
+    case ASSIGN_DIV:   return "/=";
+    case ASSIGN_MOD:   return "%=";
+    case ASSIGN_PLUS:  return "+=";
     case ASSIGN_MINUS: return "-=";
-    case ASSIGN_EQ: return "=";
+    case ASSIGN_EQ:    return "=";
     default: UNREACHABLE("assign_kind_to_str");
     }
 }

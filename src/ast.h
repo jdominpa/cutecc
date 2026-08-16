@@ -67,9 +67,11 @@ typedef enum {
     UNOP_PRE_DEC,   // --x
     UNOP_POST_INC,  // x++
     UNOP_POST_DEC,  // x--
+    UNOP_COUNT,
 } UnopKind;
 
 typedef enum {
+    BINOP_COMMA,    // `,`
     BINOP_OR,       // `||`
     BINOP_AND,      // `&&`
     BINOP_BIT_OR,   // `|`
@@ -88,6 +90,7 @@ typedef enum {
     BINOP_MULT,     // `*`
     BINOP_DIV,      // `/`
     BINOP_MOD,      // `%`
+    BINOP_COUNT,
 } BinopKind;
 
 typedef enum {
@@ -102,6 +105,7 @@ typedef enum {
     ASSIGN_PLUS,    // `+=`
     ASSIGN_MINUS,   // `-=`
     ASSIGN_EQ,      // `=`
+    ASSIGN_COUNT,
 } AssignKind;
 
 typedef enum {

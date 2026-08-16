@@ -299,7 +299,9 @@ static Expr *new_assign_expr(Arena *a, Loc loc, AssignKind kind, Expr *var, Expr
 
 static BinopKind get_binop_kind(TokenKind kind)
 {
+    static_assert(BINOP_COUNT == 19, "get_binop_kind: `BINOP_COUNT` value has changed");
     switch (kind) {
+    case TK_COMMA:     return BINOP_COMMA;
     case TK_PIPE_PIPE: return BINOP_OR;
     case TK_AMP_AMP:   return BINOP_AND;
     case TK_PIPE:      return BINOP_BIT_OR;
@@ -325,6 +327,7 @@ static BinopKind get_binop_kind(TokenKind kind)
 
 static AssignKind get_assign_kind(TokenKind kind)
 {
+    static_assert(ASSIGN_COUNT == 11, "get_assign_kind: `ASSIGN_COUNT` value has changed");
     switch (kind) {
     case TK_AMP_EQ:     return ASSIGN_AND;
     case TK_CARET_EQ:   return ASSIGN_XOR;
@@ -356,8 +359,10 @@ static bool is_assign_op(TokenKind kind)
     }
 }
 
-// Returns the binding power (left,right) of an operation with TokenKind `kind`.
-// If `kind` doesn't correspond to any operation the binding power is (0,0).
+// Returns the binding power (left,right) of an operation with TokenKind `kind`,
+// with left < right meaning left associativity, and right > left meaning right
+// associativity. If `kind` doesn't correspond to any operation the binding
+// power is (0,0).
 static BindPower get_op_bp(TokenKind kind)
 {
     switch (kind) {
@@ -389,15 +394,15 @@ static BindPower get_op_bp(TokenKind kind)
     case TK_LT_LT: case TK_GT_GT:                           // "<<", ">>"
         return (BindPower) { .left = 11, .right = 12 };
     case TK_PLUS: case TK_MINUS:                            // "+", "-"
-        return (BindPower) { .left = 11, .right = 12 };
-    case TK_STAR: case TK_SLASH: case TK_PERCENT:           // "*", "/", "%"
         return (BindPower) { .left = 12, .right = 13 };
+    case TK_STAR: case TK_SLASH: case TK_PERCENT:           // "*", "/", "%"
+        return (BindPower) { .left = 13, .right = 14 };
     // NOTE: `get_prefix_op` needs to be updated if the highest postfix operator
     // changes
     case TK_DOT: case TK_MINUS_GT:                          // ".", "->"
     case TK_OPAREN: case TK_OBRACK:                         // "(", "["
     case TK_PLUS_PLUS: case TK_MINUS_MINUS:                 // "++", "--"
-        return (BindPower) { .left = 13, .right = 14 };
+        return (BindPower) { .left = 14, .right = 15 };
     default:                                                // non-operation
         return (BindPower) { .left = 0, .right = 0 };
     }
@@ -847,6 +852,7 @@ inline Parser parser_init_from_file_path(Arena *a, const char *file_path)
 
 TranslUnit parse_transl_unit(Parser *p)
 {
-    TranslUnit tl;
-    return tl;
+    TranslUnit _tl;
+    print_stmt_compact(stdout, parse_stmt(p));
+    return _tl;
 }
