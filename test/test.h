@@ -4,14 +4,25 @@
 #include <setjmp.h>
 #include <stdio.h>
 
+#include "../src/arena.h"
+
 typedef struct {
     int passed;
     int failed;
     const char *current_test;
     jmp_buf abort_test;
+    Arena test_arena;
 } TestCtx;
 
-static TestCtx g_test_ctx = { 0 };
+static TestCtx g_test_ctx = {
+    .passed = 0,
+    .failed = 0,
+    .current_test = NULL,
+    .test_arena = {
+        .current = NULL,
+        .next_chunk_size = 0,
+    },
+};
 
 #define DEFINE_TEST(name) static void name(void)
 
@@ -27,6 +38,8 @@ static TestCtx g_test_ctx = { 0 };
             fprintf(stderr, " OK\n");                    \
         } else                                           \
             fprintf(stderr, " FAILED\n");                \
+        if (g_test_ctx.test_arena.current != NULL)       \
+            arena_reset(&g_test_ctx.test_arena);         \
     } while (0)
 
 #define TEST_FAIL(...)                                            \
@@ -99,6 +112,8 @@ static TestCtx g_test_ctx = { 0 };
 
 #define TEST_SUMMARY()                                                 \
     do {                                                               \
+        if (g_test_ctx.test_arena.current != NULL)                     \
+            arena_free(&g_test_ctx.test_arena);                        \
         fprintf(stderr, "\n%d passed, %d failed\n", g_test_ctx.passed, \
                 g_test_ctx.failed);                                    \
         if (g_test_ctx.failed > 0)                                     \

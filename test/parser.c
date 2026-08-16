@@ -1,0 +1,375 @@
+#include "../src/parser.h"
+
+#include <string.h>
+
+#include "../src/ast_print.h"
+#include "test.h"
+
+void expect_expr(const char *src, const char *expected)
+{
+    Parser p = parser_init_from_src(&g_test_ctx.test_arena, src);
+    char *buf = NULL;
+    size_t len = 0;
+    FILE *f = open_memstream(&buf, &len);
+    print_expr_compact(f, parse_expr(&p));
+    fclose(f);
+    EXPECT(len == strlen(expected) && strcmp(buf, expected) == 0,
+           "expected expression `%s` but got `%s`", expected, buf);
+    free(buf);
+}
+
+//
+// Literals and identifiers
+//
+
+DEFINE_TEST(test_literals)
+{
+    expect_expr("0", "0");
+    expect_expr("42", "42");
+    expect_expr("1234567890", "1234567890");
+    // TODO: leading zeros are not treated as octal yet, `007` is just 7
+    expect_expr("007", "7");
+    expect_expr("\"abc\"", "\"abc\"");
+    expect_expr("\"\"", "\"\"");
+    expect_expr("x", "x");
+    expect_expr("foo_bar1", "foo_bar1");
+}
+
+//
+// Precedence
+//
+
+DEFINE_TEST(test_precedence_arithmetic)
+{
+    expect_expr("a + b * c", "(binop + a (binop * b c))");
+    expect_expr("a * b + c", "(binop + (binop * a b) c)");
+    expect_expr("a - b / c", "(binop - a (binop / b c))");
+    expect_expr("a / b - c", "(binop - (binop / a b) c)");
+    expect_expr("a + b % c", "(binop + a (binop % b c))");
+    expect_expr("a % b - c", "(binop - (binop % a b) c)");
+    expect_expr("a + b - c", "(binop - (binop + a b) c)");
+    expect_expr("a * b / c % d", "(binop % (binop / (binop * a b) c) d)");
+}
+
+DEFINE_TEST(test_precedence_shift)
+{
+    expect_expr("a << b * c", "(binop << a (binop * b c))");
+    expect_expr("a >> b * c", "(binop >> a (binop * b c))");
+    expect_expr("a + b << c", "(binop << (binop + a b) c)");
+    expect_expr("a - b >> c", "(binop >> (binop - a b) c)");
+    expect_expr("a << b + c", "(binop << a (binop + b c))");
+    expect_expr("a >> b - c", "(binop >> a (binop - b c))");
+}
+
+DEFINE_TEST(test_precedence_relational_and_equality)
+{
+    expect_expr("a < b << c", "(binop < a (binop << b c))");
+    expect_expr("a << b < c", "(binop < (binop << a b) c)");
+    expect_expr("a > b >> c", "(binop > a (binop >> b c))");
+    expect_expr("a == b < c", "(binop == a (binop < b c))");
+    expect_expr("a < b == c", "(binop == (binop < a b) c)");
+    expect_expr("a != b > c", "(binop != a (binop > b c))");
+    expect_expr("a <= b >= c", "(binop >= (binop <= a b) c)");
+}
+
+DEFINE_TEST(test_precedence_bitwise)
+{
+    expect_expr("a & b == c", "(binop & a (binop == b c))");
+    expect_expr("a == b & c", "(binop & (binop == a b) c)");
+    expect_expr("a ^ b & c", "(binop ^ a (binop & b c))");
+    expect_expr("a & b ^ c", "(binop ^ (binop & a b) c)");
+    expect_expr("a | b ^ c", "(binop | a (binop ^ b c))");
+    expect_expr("a ^ b | c", "(binop | (binop ^ a b) c)");
+    expect_expr("a & b | c", "(binop | (binop & a b) c)");
+}
+
+DEFINE_TEST(test_precedence_logical)
+{
+    expect_expr("a && b | c", "(binop && a (binop | b c))");
+    expect_expr("a | b && c", "(binop && (binop | a b) c)");
+    expect_expr("a || b && c", "(binop || a (binop && b c))");
+    expect_expr("a && b || c", "(binop || (binop && a b) c)");
+}
+
+DEFINE_TEST(test_precedence_ladder)
+{
+    expect_expr("a || b && c | d ^ e & f == g < h + i * j",
+                "(binop || a (binop && b (binop | c (binop ^ d (binop & e "
+                "(binop == f (binop < g (binop + h (binop * i j)))))))))");
+}
+
+DEFINE_TEST(test_precedence_ternary)
+{
+    expect_expr("a ? b : c", "(ternop a b c)");
+    expect_expr("a || b ? c : d", "(ternop (binop || a b) c d)");
+    expect_expr("a ? b || c : d", "(ternop a (binop || b c) d)");
+    expect_expr("a ? b : c || d", "(ternop a b (binop || c d))");
+}
+
+DEFINE_TEST(test_precedence_assignment)
+{
+    expect_expr("a = b + c", "(assign = a (binop + b c))");
+    expect_expr("a += b * c", "(assign += a (binop * b c))");
+    expect_expr("a = b ? c : d", "(assign = a (ternop b c d))");
+    // The third operand of `?:` is an assignment expression, so the `=` binds
+    // inside the else branch rather than around the whole conditional.
+    expect_expr("a ? b : c = d", "(ternop a b (assign = c d))");
+    // The parser is purely syntactic: it does not reject a non-lvalue target.
+    expect_expr("a + b = c", "(assign = (binop + a b) c)");
+}
+
+DEFINE_TEST(test_precedence_comma)
+{
+    expect_expr("a, b &= c", "(binop , a (assign &= b c))");
+    expect_expr("a ^= b, c", "(binop , (assign ^= a b) c)");
+}
+
+//
+// Prefix operators
+//
+
+DEFINE_TEST(test_prefix_operators)
+{
+    expect_expr("+a", "(unop + a)");
+    expect_expr("-a", "(unop - a)");
+    expect_expr("!a", "(unop ! a)");
+    expect_expr("~a", "(unop ~ a)");
+    expect_expr("*a", "(unop * a)");
+    expect_expr("&a", "(unop & a)");
+    expect_expr("++a", "(unop ++ (pre) a)");
+    expect_expr("--a", "(unop -- (pre) a)");
+}
+
+DEFINE_TEST(test_repeated_prefix_operators)
+{
+    expect_expr("- -a", "(unop - (unop - a))");
+    expect_expr("!!a", "(unop ! (unop ! a))");
+    expect_expr("**a", "(unop * (unop * a))");
+    expect_expr("~~a", "(unop ~ (unop ~ a))");
+}
+
+DEFINE_TEST(test_prefix_binds_tighter_than_binary)
+{
+    expect_expr("-a * b", "(binop * (unop - a) b)");
+    expect_expr("-a + b", "(binop + (unop - a) b)");
+    expect_expr("!a && b", "(binop && (unop ! a) b)");
+    expect_expr("~a | b", "(binop | (unop ~ a) b)");
+    expect_expr("*a + b", "(binop + (unop * a) b)");
+    expect_expr("&a == b", "(binop == (unop & a) b)");
+    expect_expr("++a * b", "(binop * (unop ++ (pre) a) b)");
+    expect_expr("--a + b", "(binop + (unop -- (pre) a) b)");
+}
+
+//
+// Postfix operators
+//
+
+DEFINE_TEST(test_postfix_operators)
+{
+    expect_expr("a++", "(unop ++ (post) a)");
+    expect_expr("a--", "(unop -- (post) a)");
+    expect_expr("a++ + b", "(binop + (unop ++ (post) a) b)");
+}
+
+// Postfix binds tighter than prefix: `*p++` is `*(p++)`, not `(*p)++`.
+DEFINE_TEST(test_postfix_binds_tighter_than_prefix)
+{
+    expect_expr("*p++", "(unop * (unop ++ (post) p))");
+    expect_expr("-a++", "(unop - (unop ++ (post) a))");
+    expect_expr("++a++", "(unop ++ (pre) (unop ++ (post) a))");
+    expect_expr("-a.b", "(unop - (field b a))");
+    expect_expr("*a[0]", "(unop * (subscript a 0))");
+    expect_expr("*f(x)", "(unop * (fn_call f x))");
+}
+
+//
+// Function calls
+//
+
+DEFINE_TEST(test_function_calls)
+{
+    expect_expr("f()", "(fn_call f)");
+    expect_expr("f(a)", "(fn_call f a)");
+    expect_expr("f(a, b)", "(fn_call f a b)");
+    expect_expr("f(a, b, c)", "(fn_call f a b c)");
+    expect_expr("f(g(x))", "(fn_call f (fn_call g x))");
+}
+
+DEFINE_TEST(test_function_call_arguments)
+{
+    expect_expr("f(a + b)", "(fn_call f (binop + a b))");
+    expect_expr("f(a, b + c)", "(fn_call f a (binop + b c))");
+    expect_expr("f(a = b)", "(fn_call f (assign = a b))");
+    expect_expr("f(a ? b : c)", "(fn_call f (ternop a b c))");
+}
+
+//
+// Array subscript
+//
+
+DEFINE_TEST(test_array_subscript)
+{
+    expect_expr("a[0]", "(subscript a 0)");
+    expect_expr("a[i + 1]", "(subscript a (binop + i 1))");
+    expect_expr("a[b][c]", "(subscript (subscript a b) c)");
+    expect_expr("a[f(x)]", "(subscript a (fn_call f x))");
+    expect_expr("a[0] + b", "(binop + (subscript a 0) b)");
+}
+
+//
+// Member access
+//
+
+DEFINE_TEST(test_member_access)
+{
+    expect_expr("a.b", "(field b a)");
+    expect_expr("a->b", "(arrow b a)");
+    expect_expr("a->b.c", "(field c (arrow b a))");
+    expect_expr("a.b->c", "(arrow c (field b a))");
+    expect_expr("a.b + c", "(binop + (field b a) c)");
+}
+
+DEFINE_TEST(test_postfix_chains)
+{
+    expect_expr("a[0].b", "(field b (subscript a 0))");
+    expect_expr("a.b[0]", "(subscript (field b a) 0)");
+    expect_expr("f(x)[0]", "(subscript (fn_call f x) 0)");
+}
+
+//
+// Casts
+//
+
+DEFINE_TEST(test_casts)
+{
+    expect_expr("(int) x", "(cast (type int) x)");
+    expect_expr("(long) x", "(cast (type long) x)");
+    expect_expr("(void) x", "(cast (type void) x)");
+    expect_expr("(unsigned) x", "(cast (type unsigned_int) x)");
+    expect_expr("(int *) x", "(cast (ptr_type (type int)) x)");
+    expect_expr("(int) (char) x", "(cast (type int) (cast (type char) x))");
+}
+
+DEFINE_TEST(test_cast_binding)
+{
+    expect_expr("(char) a + b", "(binop + (cast (type char) a) b)");
+    expect_expr("(double) x * y", "(binop * (cast (type double) x) y)");
+    expect_expr("(int) -a", "(cast (type int) (unop - a))");
+    expect_expr("(int) a.b", "(cast (type int) (field b a))");
+}
+
+//
+// sizeof and _Alignof
+//
+
+DEFINE_TEST(test_sizeof)
+{
+    expect_expr("sizeof(int)", "(sizeof_type (type int))");
+    expect_expr("sizeof(int *)", "(sizeof_type (ptr_type (type int)))");
+    expect_expr("sizeof x", "(sizeof_value x)");
+    expect_expr("sizeof a.b", "(sizeof_value (field b a))");
+    expect_expr("sizeof -a", "(sizeof_value (unop - a))");
+    expect_expr("sizeof x + y", "(binop + (sizeof_value x) y)");
+    expect_expr("sizeof(int) + 1", "(binop + (sizeof_type (type int)) 1)");
+}
+
+DEFINE_TEST(test_alignof)
+{
+    expect_expr("_Alignof(int)", "(alignof (type int))");
+    expect_expr("alignof(int)", "(alignof (type int))");
+    expect_expr("_Alignof(double)", "(alignof (type double))");
+    expect_expr("_Alignof(char *)", "(alignof (ptr_type (type char)))");
+}
+
+//
+// Parentheses
+//
+// TODO: only expressions whose first token is not an identifier can be
+// parenthesised today. parse_expr_head() calls is_type() on the token after
+// `(`, and is_type() hits a TODO() for identifiers, so `(a + b) * c` aborts.
+//
+
+DEFINE_TEST(test_parenthesized_expressions)
+{
+    expect_expr("((1))", "1");
+    expect_expr("(1 + 2) * 3", "(binop * (binop + 1 2) 3)");
+    expect_expr("1 * (2 + 3)", "(binop * 1 (binop + 2 3))");
+    expect_expr("(1 + 2) * (3 + 4)", "(binop * (binop + 1 2) (binop + 3 4))");
+    expect_expr("-(1 + 2)", "(unop - (binop + 1 2))");
+    expect_expr("f((1 + 2))", "(fn_call f (binop + 1 2))");
+}
+
+DEFINE_TEST(test_binop_assoc)
+{
+    // Right associative
+    expect_expr("a &= b &= c", "(assign &= a (assign &= b c))");
+    expect_expr("a ^= b ^= c", "(assign ^= a (assign ^= b c))");
+    expect_expr("a |= b |= c", "(assign |= a (assign |= b c))");
+    expect_expr("a <<= b <<= c", "(assign <<= a (assign <<= b c))");
+    expect_expr("a >>= b >>= c", "(assign >>= a (assign >>= b c))");
+    expect_expr("a *= b *= c", "(assign *= a (assign *= b c))");
+    expect_expr("a /= b /= c", "(assign /= a (assign /= b c))");
+    expect_expr("a %= b %= c", "(assign %= a (assign %= b c))");
+    expect_expr("a += b += c", "(assign += a (assign += b c))");
+    expect_expr("a -= b -= c", "(assign -= a (assign -= b c))");
+    expect_expr("a = b = c", "(assign = a (assign = b c))");
+    expect_expr("a ? b : c ? d : e", "(ternop a b (ternop c d e))");
+
+    // Left associative
+    expect_expr("a, b, c", "(binop , (binop , a b) c)");
+    expect_expr("a || b || c", "(binop || (binop || a b) c)");
+    expect_expr("a && b && c", "(binop && (binop && a b) c)");
+    expect_expr("a | b | c", "(binop | (binop | a b) c)");
+    expect_expr("a ^ b ^ c", "(binop ^ (binop ^ a b) c)");
+    expect_expr("a & b & c", "(binop & (binop & a b) c)");
+    expect_expr("a == b == c", "(binop == (binop == a b) c)");
+    expect_expr("a != b != c", "(binop != (binop != a b) c)");
+    expect_expr("a < b < c", "(binop < (binop < a b) c)");
+    expect_expr("a <= b <= c", "(binop <= (binop <= a b) c)");
+    expect_expr("a > b > c", "(binop > (binop > a b) c)");
+    expect_expr("a >= b >= c", "(binop >= (binop >= a b) c)");
+    expect_expr("a << b << c", "(binop << (binop << a b) c)");
+    expect_expr("a >> b >> c", "(binop >> (binop >> a b) c)");
+    expect_expr("a + b + c", "(binop + (binop + a b) c)");
+    expect_expr("a - b - c", "(binop - (binop - a b) c)");
+    expect_expr("a * b * c", "(binop * (binop * a b) c)");
+    expect_expr("a / b / c", "(binop / (binop / a b) c)");
+    expect_expr("a % b % c", "(binop % (binop % a b) c)");
+    expect_expr("a.b.c", "(field c (field b a))");
+    expect_expr("a->b->c", "(arrow c (arrow b a))");
+    expect_expr("a++++", "(unop ++ (post) (unop ++ (post) a))");
+    expect_expr("a----", "(unop -- (post) (unop -- (post) a))");
+}
+
+int main(void)
+{
+    g_test_ctx.test_arena = arena_init();
+    RUN_TEST(test_literals);
+    RUN_TEST(test_precedence_arithmetic);
+    RUN_TEST(test_precedence_shift);
+    RUN_TEST(test_precedence_relational_and_equality);
+    RUN_TEST(test_precedence_bitwise);
+    RUN_TEST(test_precedence_logical);
+    RUN_TEST(test_precedence_ladder);
+    RUN_TEST(test_precedence_ternary);
+    RUN_TEST(test_precedence_assignment);
+    RUN_TEST(test_precedence_comma);
+    RUN_TEST(test_prefix_operators);
+    RUN_TEST(test_repeated_prefix_operators);
+    RUN_TEST(test_prefix_binds_tighter_than_binary);
+    RUN_TEST(test_postfix_operators);
+    RUN_TEST(test_postfix_binds_tighter_than_prefix);
+    RUN_TEST(test_function_calls);
+    RUN_TEST(test_function_call_arguments);
+    RUN_TEST(test_array_subscript);
+    RUN_TEST(test_member_access);
+    RUN_TEST(test_postfix_chains);
+    RUN_TEST(test_casts);
+    RUN_TEST(test_cast_binding);
+    RUN_TEST(test_sizeof);
+    RUN_TEST(test_alignof);
+    RUN_TEST(test_parenthesized_expressions);
+    RUN_TEST(test_binop_assoc);
+    TEST_SUMMARY();
+    return 0;
+}
