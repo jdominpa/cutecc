@@ -104,6 +104,6 @@ extern const char *const token_kind_to_str[TK_COUNT];
 const char *token_to_str(Token t);
 Token lexer_next_token(Lexer *l);
 Lexer lexer_init_from_src(const char *source);
-Lexer lexer_init_from_file_path(Arena *a, const char *file_path);
+Lexer lexer_init_from_file_path(Arena *a, const char *path);
 
 #endif  // LEXER_H_

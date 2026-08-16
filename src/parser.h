@@ -24,7 +24,7 @@ typedef struct {
 
 Parser parser_init_from_lexer(Arena *a, Lexer l);
 Parser parser_init_from_src(Arena *a, const char *src);
-Parser parser_init_from_file_path(Arena *a, const char *file_path);
+Parser parser_init_from_file_path(Arena *a, const char *path);
 Type parse_type(Parser *p);
 Expr *parse_expr(Parser *p);
 Stmt *parse_stmt(Parser *p);

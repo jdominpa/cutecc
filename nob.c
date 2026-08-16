@@ -39,6 +39,7 @@ static bool build_static_libsimpcc(Cmd *cmd)
         "arena",
         "ast_print",
         "diag",
+        "io",
         "lexer",
         "parser",
     };

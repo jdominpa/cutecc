@@ -845,9 +845,9 @@ inline Parser parser_init_from_src(Arena *a, const char *src)
     return parser_init_from_lexer(a, lexer_init_from_src(src));
 }
 
-inline Parser parser_init_from_file_path(Arena *a, const char *file_path)
+inline Parser parser_init_from_file_path(Arena *a, const char *path)
 {
-    return parser_init_from_lexer(a, lexer_init_from_file_path(a, file_path));
+    return parser_init_from_lexer(a, lexer_init_from_file_path(a, path));
 }
 
 TranslUnit parse_transl_unit(Parser *p)

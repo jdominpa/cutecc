@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "diag.h"
+#include "io.h"
 
 static Loc lexer_get_loc(Lexer *l)
 {
@@ -433,26 +434,12 @@ Lexer lexer_init_from_src(const char *src)
 
 // Accepts an arena where the source code of a file will be stored and the file
 // path. Returns the initialized lexer.
-Lexer lexer_init_from_file_path(Arena *a, const char *file_path)
+Lexer lexer_init_from_file_path(Arena *a, const char *path)
 {
-    /* Read file */
-    FILE *f = fopen(file_path, "rb");
-    if (f == NULL)
-        diag_fatal("could not open file '%s' for parsing", file_path);
-    fseek(f, 0, SEEK_END);
-    size_t size = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    char *src = arena_alloc_many(a, char, size + 1);
-    if (src == NULL)
-        diag_fatal("could not allocate memory to read file '%s'", file_path);
-    size_t size_read = fread(src, 1, size, f);
-    if (size_read != size)
-        diag_fatal("expected %zu bytes from file '%s' but got %zu", size,
-                   file_path, size_read);
-    fclose(f);
-    src[size] = '\0';
-
+    char *src;
+    if (!read_entire_file(a, path, src, NULL))
+        diag_fatal("could not read input file '%s'", path);
     Lexer l = lexer_init_from_src(src);
-    l.file_path = file_path;
+    l.file_path = path;
     return l;
 }
