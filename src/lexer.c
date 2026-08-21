@@ -437,7 +437,7 @@ Lexer lexer_init_from_src(const char *src)
 Lexer lexer_init_from_file_path(Arena *a, const char *path)
 {
     char *src;
-    if (!read_entire_file(a, path, src, NULL))
+    if (!read_entire_file(a, path, &src, NULL))
         diag_fatal("could not read input file '%s'", path);
     Lexer l = lexer_init_from_src(src);
     l.file_path = path;
