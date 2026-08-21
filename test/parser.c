@@ -6,6 +6,33 @@
 #include "../src/io.h"
 #include "test.h"
 
+// Formats `fmt` into `buf` and reports a failure if it did not fit. Returns
+// whether the result is complete (a silently truncated path would make the test
+// read or write the wrong file).
+static bool format_path(char *buf, size_t size, const char *fmt, const char *arg)
+{
+    int n = snprintf(buf, size, fmt, arg);
+    if (n < 0) {
+        TEST_FAIL("could not format a path for '%s'", arg);
+        return false;
+    }
+    if ((size_t) n >= size) {
+        TEST_FAIL("path for '%s' needs %d bytes but only %zu are available",
+                  arg, n, size);
+        return false;
+    }
+    return true;
+}
+
+// Checks that all tokens in the parser have been consumed.
+static void expect_input_consumed(Parser *p, const char *src)
+{
+    Token left = p->tokens[p->pos];
+    EXPECT(left.kind == TK_EOF,
+           "expected the whole input `%s` to be parsed but %s was left over",
+           src, token_to_str(left));
+}
+
 static void expect_expr(const char *src, const char *expected)
 {
     Parser p = parser_init_from_src(&g_test_ctx.test_arena, src);
@@ -16,15 +43,17 @@ static void expect_expr(const char *src, const char *expected)
     fclose(f);
     EXPECT(len == strlen(expected) && strcmp(got, expected) == 0,
            "expected expression `%s` but got `%s`", expected, got);
+    expect_input_consumed(&p, src);
     free(got);
 }
 
-static void expect_stmt_from_file(const char *src, const char *input)
+static void expect_stmt_from_file(const char *src, const char *file_name)
 {
     char path[512];
     // `TEST_DATA_DIR` is passed through `-DTEST_DATA_DIR` at compile time of
     // the unit tests (see nob.c)
-    snprintf(path, sizeof path, TEST_DATA_DIR"%s", input);
+    if (!format_path(path, sizeof path, TEST_DATA_DIR"%s", file_name))
+        return;
     char *expected;
     bool pass =
         read_entire_file(&g_test_ctx.test_arena, path, &expected, NULL);
@@ -36,6 +65,7 @@ static void expect_stmt_from_file(const char *src, const char *input)
     FILE *f = open_memstream(&got, &len);
     print_stmt(f, parse_stmt(&p), 0);
     fclose(f);
+    expect_input_consumed(&p, src);
     if (pass) {
         pass = len == strlen(expected) && strcmp(got, expected) == 0;
         EXPECT(pass,
@@ -46,11 +76,15 @@ static void expect_stmt_from_file(const char *src, const char *input)
     // Write .actual file with test output in case of test failure
     if (!pass) {
         char output[1024];
-        snprintf(output, sizeof output, "%s.actual", path);
-        FILE *out = fopen(output, "w");
-        EXPECT(out, "could not open test output file '%s'", output);
-        fwrite(got, 1, len, out);
-        fclose(out);
+        if (format_path(output, sizeof output, "%s.actual", path)) {
+            FILE *out = fopen(output, "w");
+            if (out == NULL) {
+                TEST_FAIL("could not open test output file '%s'", output);
+            } else {
+                fwrite(got, 1, len, out);
+                fclose(out);
+            }
+        }
     }
     free(got);
 }
@@ -386,9 +420,57 @@ DEFINE_TEST(test_jump_statements)
 {
     expect_stmt_from_file("break;", "test_break_stmt");
     expect_stmt_from_file("continue;", "test_continue_stmt");
+    expect_stmt_from_file("goto a;", "test_goto_stmt");
+}
+
+//
+// Return statements
+//
+
+DEFINE_TEST(test_return_statements)
+{
     expect_stmt_from_file("return;", "test_void_return_stmt");
     expect_stmt_from_file("return 0;", "test_nonvoid_return_stmt");
-    expect_stmt_from_file("goto a;", "test_goto_stmt");
+    expect_stmt_from_file("return a + b;", "test_return_expr_stmt");
+    expect_stmt_from_file("return f(x);", "test_return_call_stmt");
+}
+
+//
+// Block statements
+//
+
+DEFINE_TEST(test_block_statements)
+{
+    expect_stmt_from_file("{}", "test_empty_block_stmt");
+    expect_stmt_from_file("{ break; }", "test_single_block_stmt");
+    expect_stmt_from_file("{ break; continue; }", "test_multi_block_stmt");
+    expect_stmt_from_file("{ { break; } }", "test_nested_block_stmt");
+    expect_stmt_from_file("{ if (a) break; return 0; }", "test_mixed_block_stmt");
+}
+
+//
+// If statements
+//
+
+DEFINE_TEST(test_if_statements)
+{
+    expect_stmt_from_file("if (a) break;", "test_if_stmt");
+    expect_stmt_from_file("if (a) break; else continue;", "test_if_else_stmt");
+    expect_stmt_from_file("if (a) { break; }", "test_if_block_stmt");
+    expect_stmt_from_file("if (a) { break; } else { continue; }",
+                          "test_if_else_block_stmt");
+    expect_stmt_from_file("if (a && b) break;", "test_if_complex_cond_stmt");
+}
+
+DEFINE_TEST(test_if_statement_nesting)
+{
+    expect_stmt_from_file("if (a) if (b) break; else continue;",
+                          "test_dangling_else_stmt");
+    // `else if` is just an `if` statement in the else branch.
+    expect_stmt_from_file("if (a) break; else if (b) continue; else return;",
+                          "test_else_if_chain_stmt");
+    expect_stmt_from_file("if (a) { if (b) break; else continue; }",
+                          "test_if_in_block_stmt");
 }
 
 int main(void)
@@ -421,6 +503,10 @@ int main(void)
     RUN_TEST(test_parenthesized_expressions);
     RUN_TEST(test_binop_assoc);
     RUN_TEST(test_jump_statements);
+    RUN_TEST(test_return_statements);
+    RUN_TEST(test_block_statements);
+    RUN_TEST(test_if_statements);
+    RUN_TEST(test_if_statement_nesting);
     TEST_SUMMARY();
     return 0;
 }

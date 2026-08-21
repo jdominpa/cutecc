@@ -1,0 +1,4 @@
+(if <1:1>
+  condition: (ident <1:5> a)
+  then: (block <1:8>
+    statement 0: (break <1:10>)))

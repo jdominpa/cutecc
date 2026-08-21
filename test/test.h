@@ -7,16 +7,18 @@
 #include "../src/arena.h"
 
 typedef struct {
-    int passed;
-    int failed;
+    int tests_passed;
+    int tests_failed;
+    int checks_failed;  // a tests may contain multiple checks
     const char *current_test;
     jmp_buf abort_test;
     Arena test_arena;
 } TestCtx;
 
 static TestCtx g_test_ctx = {
-    .passed = 0,
-    .failed = 0,
+    .tests_passed = 0,
+    .tests_failed = 0,
+    .checks_failed = 0,
     .current_test = NULL,
     .test_arena = {
         .current = NULL,
@@ -29,15 +31,17 @@ static TestCtx g_test_ctx = {
 #define RUN_TEST(name)                                   \
     do {                                                 \
         g_test_ctx.current_test = #name;                 \
-        int prev_failed = g_test_ctx.failed;             \
+        int prev_failed = g_test_ctx.checks_failed;      \
         if (setjmp(g_test_ctx.abort_test) == 0)          \
             name();                                      \
         fprintf(stderr, "%s:", g_test_ctx.current_test); \
-        if (g_test_ctx.failed == prev_failed) {          \
-            g_test_ctx.passed++;                         \
+        if (g_test_ctx.checks_failed == prev_failed) {   \
+            g_test_ctx.tests_passed++;                   \
             fprintf(stderr, " OK\n");                    \
-        } else                                           \
+        } else {                                         \
+            g_test_ctx.tests_failed++;                   \
             fprintf(stderr, " FAILED\n");                \
+        }                                                \
         if (g_test_ctx.test_arena.current != NULL)       \
             arena_reset(&g_test_ctx.test_arena);         \
     } while (0)
@@ -47,7 +51,7 @@ static TestCtx g_test_ctx = {
         fprintf(stderr, "    %s:%d: FAIL: ", __FILE__, __LINE__); \
         fprintf(stderr, __VA_ARGS__);                             \
         fprintf(stderr, "\n");                                    \
-        g_test_ctx.failed++;                                      \
+        g_test_ctx.checks_failed++;                               \
     } while (0)
 
 #define EXPECT(cond, ...)           \
@@ -110,14 +114,18 @@ static TestCtx g_test_ctx = {
     } while (0)
 #endif  // _WIN32
 
-#define TEST_SUMMARY()                                                 \
-    do {                                                               \
-        if (g_test_ctx.test_arena.current != NULL)                     \
-            arena_free(&g_test_ctx.test_arena);                        \
-        fprintf(stderr, "\n%d passed, %d failed\n", g_test_ctx.passed, \
-                g_test_ctx.failed);                                    \
-        if (g_test_ctx.failed > 0)                                     \
-            return 1;                                                  \
+#define TEST_SUMMARY()                                                        \
+    do {                                                                      \
+        if (g_test_ctx.test_arena.current != NULL)                            \
+            arena_free(&g_test_ctx.test_arena);                               \
+        fprintf(stderr, "\n%d passed, %d failed", g_test_ctx.tests_passed,    \
+                g_test_ctx.tests_failed);                                     \
+        if (g_test_ctx.checks_failed > 0)                                     \
+            fprintf(stderr, " (%d failed check%s)", g_test_ctx.checks_failed, \
+                    g_test_ctx.checks_failed == 1 ? "" : "s");                \
+        fprintf(stderr, "\n");                                                \
+        if (g_test_ctx.tests_failed > 0)                                      \
+            return 1;                                                         \
     } while (0)
 
 #endif  // TEST_H_
