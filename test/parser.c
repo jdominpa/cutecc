@@ -3,19 +3,56 @@
 #include <string.h>
 
 #include "../src/ast_print.h"
+#include "../src/io.h"
 #include "test.h"
 
-void expect_expr(const char *src, const char *expected)
+static void expect_expr(const char *src, const char *expected)
 {
     Parser p = parser_init_from_src(&g_test_ctx.test_arena, src);
-    char *buf = NULL;
+    char *got = NULL;
     size_t len = 0;
-    FILE *f = open_memstream(&buf, &len);
+    FILE *f = open_memstream(&got, &len);
     print_expr_compact(f, parse_expr(&p));
     fclose(f);
-    EXPECT(len == strlen(expected) && strcmp(buf, expected) == 0,
-           "expected expression `%s` but got `%s`", expected, buf);
-    free(buf);
+    EXPECT(len == strlen(expected) && strcmp(got, expected) == 0,
+           "expected expression `%s` but got `%s`", expected, got);
+    free(got);
+}
+
+static void expect_stmt_from_file(const char *src, const char *input)
+{
+    char path[512];
+    // `TEST_DATA_DIR` is passed through `-DTEST_DATA_DIR` at compile time of
+    // the unit tests (see nob.c)
+    snprintf(path, sizeof path, TEST_DATA_DIR"%s", input);
+    char *expected;
+    bool pass =
+        read_entire_file(&g_test_ctx.test_arena, path, &expected, NULL);
+    EXPECT(pass, "could not read expected output file '%s'", path);
+
+    Parser p = parser_init_from_src(&g_test_ctx.test_arena, src);
+    char *got = NULL;
+    size_t len = 0;
+    FILE *f = open_memstream(&got, &len);
+    print_stmt(f, parse_stmt(&p), 0);
+    fclose(f);
+    if (pass) {
+        pass = len == strlen(expected) && strcmp(got, expected) == 0;
+        EXPECT(pass,
+               "mismatch between expected and actual output (run: diff -u %s %s.actual)",
+               path, path);
+    }
+
+    // Write .actual file with test output in case of test failure
+    if (!pass) {
+        char output[1024];
+        snprintf(output, sizeof output, "%s.actual", path);
+        FILE *out = fopen(output, "w");
+        EXPECT(out, "could not open test output file '%s'", output);
+        fwrite(got, 1, len, out);
+        fclose(out);
+    }
+    free(got);
 }
 
 //
@@ -341,6 +378,19 @@ DEFINE_TEST(test_binop_assoc)
     expect_expr("a----", "(unop -- (post) (unop -- (post) a))");
 }
 
+//
+// Jump statements
+//
+
+DEFINE_TEST(test_jump_statements)
+{
+    expect_stmt_from_file("break;", "test_break_stmt");
+    expect_stmt_from_file("continue;", "test_continue_stmt");
+    expect_stmt_from_file("return;", "test_void_return_stmt");
+    expect_stmt_from_file("return 0;", "test_nonvoid_return_stmt");
+    expect_stmt_from_file("goto a;", "test_goto_stmt");
+}
+
 int main(void)
 {
     g_test_ctx.test_arena = arena_init();
@@ -370,6 +420,7 @@ int main(void)
     RUN_TEST(test_alignof);
     RUN_TEST(test_parenthesized_expressions);
     RUN_TEST(test_binop_assoc);
+    RUN_TEST(test_jump_statements);
     TEST_SUMMARY();
     return 0;
 }

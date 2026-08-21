@@ -1,6 +1,7 @@
-build/
 nob
 nob.old
+build/
+test/expected/*.actual
 
 # Devenv
 .devenv*

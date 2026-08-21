@@ -9,6 +9,7 @@
 #define BUILD_DIR "./build/"
 #define SRC_DIR "./src/"
 #define TEST_DIR "./test/"
+#define TEST_DATA_DIR "./test/expected/"
 
 // Appends every header in SRC_DIR to `headers`. Nothing here tracks which
 // translation unit includes which header, so a change to any of them rebuilds
@@ -99,6 +100,7 @@ static bool build_tests(Cmd *cmd)
     Nob_File_Paths headers = { 0 };
     Nob_File_Paths inputs = { 0 };
 
+    if (!nob_mkdir_if_not_exists(TEST_DATA_DIR)) nob_return_defer(false);
     if (!collect_src_headers(&headers)) nob_return_defer(false);
 
     for (size_t i = 0; i < NOB_ARRAY_LEN(test_files); ++i) {
@@ -117,6 +119,7 @@ static bool build_tests(Cmd *cmd)
             nob_cmd_append(cmd, "cc", CFLAGS, "-o", test_bin);
             nob_cmd_append(cmd, input_test_file);
             nob_cmd_append(cmd, BUILD_DIR"libsimpcc.a");
+            nob_cmd_append(cmd, nob_temp_sprintf("-DTEST_DATA_DIR=\"%s\"", TEST_DATA_DIR));
             if (!nob_cmd_run(cmd)) nob_return_defer(false);
         }
     }
@@ -153,12 +156,33 @@ defer:
     return result;
 }
 
+static bool update_test_data_files(void)
+{
+    bool result = true;
+    Nob_File_Paths files = { 0 };
+    if (!nob_read_entire_dir(TEST_DATA_DIR, &files)) nob_return_defer(false);
+    for (size_t i = 0; i < files.count; ++i) {
+        Nob_String_View name = nob_sv_from_cstr(files.items[i]);
+        if (!nob_sv_chop_suffix(&name, nob_sv_from_cstr(".actual"))) continue;
+        const char *src = nob_temp_sprintf(TEST_DATA_DIR SV_Fmt ".actual", SV_Arg(name));
+        const char *dst = nob_temp_sprintf(TEST_DATA_DIR SV_Fmt, SV_Arg(name));
+        nob_log(NOB_INFO, "updating %s", dst);
+        if (!nob_rename(src, dst)) nob_return_defer(false);
+    }
+
+defer:
+    nob_da_free(files);
+    return result;
+}
+
 static void usage(const char *program)
 {
     nob_log(NOB_INFO, "Usage: %s [<subcommand>]", program);
     nob_log(NOB_INFO, "Subcommands:");
     nob_log(NOB_INFO, "    test");
     nob_log(NOB_INFO, "        Build and run compiler tests.");
+    nob_log(NOB_INFO, "    update_tests");
+    nob_log(NOB_INFO, "        Update the expected test output files in '%s'.", TEST_DATA_DIR);
     nob_log(NOB_INFO, "    build");
     nob_log(NOB_INFO, "        Build the compiler.");
     nob_log(NOB_INFO, "    run [<args>]");
@@ -188,6 +212,8 @@ int main(int argc, char **argv)
             if (!nob_cmd_run(&cmd)) err = true;
         }
         if (err) return 1;
+    } else if (strcmp(arg, "update_tests") == 0) {
+        if (!update_test_data_files()) return 1;
     } else if (strcmp(arg, "build") == 0) {
         if (!build_static_libsimpcc(&cmd)) return 1;
         if (!build_simpcc(&cmd)) return 1;
