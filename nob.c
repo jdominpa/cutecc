@@ -163,7 +163,7 @@ static bool update_test_data_files(void)
     if (!nob_read_entire_dir(TEST_DATA_DIR, &files)) nob_return_defer(false);
     for (size_t i = 0; i < files.count; ++i) {
         Nob_String_View name = nob_sv_from_cstr(files.items[i]);
-        if (!nob_sv_chop_suffix(&name, nob_sv_from_cstr(".actual"))) continue;
+        if (!nob_sv_ends_with_cstr(name, ".actual")) continue;
         const char *src = nob_temp_sprintf(TEST_DATA_DIR SV_Fmt ".actual", SV_Arg(name));
         const char *dst = nob_temp_sprintf(TEST_DATA_DIR SV_Fmt, SV_Arg(name));
         nob_log(NOB_INFO, "updating %s", dst);

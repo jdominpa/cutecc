@@ -1,5 +1,6 @@
 #include "../src/parser.h"
 
+#include <assert.h>
 #include <string.h>
 
 #include "../src/ast_print.h"
@@ -27,6 +28,7 @@ static bool format_path(char *buf, size_t size, const char *fmt, const char *arg
 // Checks that all tokens in the parser have been consumed.
 static void expect_input_consumed(Parser *p, const char *src)
 {
+    assert(p->pos < p->token_count);
     Token left = p->tokens[p->pos];
     EXPECT(left.kind == TK_EOF,
            "expected the whole input `%s` to be parsed but %s was left over",
@@ -52,8 +54,7 @@ static void expect_stmt_from_file(const char *src, const char *file_name)
     char path[512];
     // `TEST_DATA_DIR` is passed through `-DTEST_DATA_DIR` at compile time of
     // the unit tests (see nob.c)
-    if (!format_path(path, sizeof path, TEST_DATA_DIR"%s", file_name))
-        return;
+    if (!format_path(path, sizeof path, TEST_DATA_DIR"%s", file_name)) return;
     char *expected;
     bool pass =
         read_entire_file(&g_test_ctx.test_arena, path, &expected, NULL);
@@ -73,7 +74,8 @@ static void expect_stmt_from_file(const char *src, const char *file_name)
                path, path);
     }
 
-    // Write .actual file with test output in case of test failure
+    // Write .actual file with test output in case of test failure (mismatch or
+    // missing golden file)
     if (!pass) {
         char output[1024];
         if (format_path(output, sizeof output, "%s.actual", path)) {
