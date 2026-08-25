@@ -378,6 +378,13 @@ static void print_stmt_ctx(PrintCtx *ctx, const Stmt *s)
         }
         fprintf(ctx->out, ")");
         break;
+    case STMT_WHILE:
+        fprintf(ctx->out, "(while");
+        print_loc(ctx, s->loc);
+        print_expr_field(ctx, "condition", s->_while.cond);
+        print_stmt_field(ctx, "body", s->_while.body);
+        fprintf(ctx->out, ")");
+        break;
     case STMT_IF:
         fprintf(ctx->out, "(if");
         print_loc(ctx, s->loc);

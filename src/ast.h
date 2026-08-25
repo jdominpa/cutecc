@@ -224,7 +224,7 @@ struct Stmt {
             Expr value;
         } decl;
         struct {
-            Expr cond;
+            Expr *cond;
             Stmt *body;
         } _while;
         struct {

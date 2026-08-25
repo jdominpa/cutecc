@@ -802,6 +802,15 @@ Stmt *parse_stmt(Parser *p)
                 parser_bump(p);
                 s->_if._else = parse_stmt(p);
             }
+        } else if (token_equal(t, "while")) {
+            s->kind = STMT_WHILE;
+            s->loc = t.loc;
+            if (!parser_expect(p, TK_OPAREN))
+                UNREACHABLE("parser_expect is currently nonreturnable");
+            s->_while.cond = parse_expr(p);
+            if (!parser_expect(p, TK_CPAREN))
+                UNREACHABLE("parser_expect is currently nonreturnable");
+            s->_while.body = parse_stmt(p);
         } else {
             TODO("implemenet the rest of statements that begin with keywords");
         }
