@@ -1,0 +1,5 @@
+(while <1:1>
+  condition: (binop <1:10> ||
+    lhs: (ident <1:8> a)
+    rhs: (ident <1:13> b))
+  body: (break <1:16>))
