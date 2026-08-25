@@ -483,6 +483,13 @@ DEFINE_TEST(test_while_statement)
                           "test_while_complex_cond_stmt");
 }
 
+DEFINE_TEST(test_do_statement)
+{
+    expect_stmt_from_file("do break; while (a);", "test_do_stmt");
+    expect_stmt_from_file("do { break; } while (a);", "test_do_block_stmt");
+    expect_stmt_from_file("do break; while (a && b);", "test_do_complex_cond_stmt");
+}
+
 int main(void)
 {
     g_test_ctx.test_arena = arena_init();
@@ -518,6 +525,7 @@ int main(void)
     RUN_TEST(test_if_statements);
     RUN_TEST(test_if_statement_nesting);
     RUN_TEST(test_while_statement);
+    RUN_TEST(test_do_statement);
     TEST_SUMMARY();
     return 0;
 }
