@@ -763,30 +763,26 @@ Stmt *parse_stmt(Parser *p)
     switch (t.kind) {
     case TK_KW: {
         Stmt *s = arena_alloc(p->a, Stmt);
-        if (token_equal(t, "break")) {
-            s->kind = STMT_BREAK;
+        if (token_equal(t, "while")) {
+            s->kind = STMT_WHILE;
             s->loc = t.loc;
-            if (!parser_expect(p, TK_SEMI))
+            if (!parser_expect(p, TK_OPAREN))
                 UNREACHABLE("parser_expect is currently nonreturnable");
-        } else if (token_equal(t, "continue")) {
-            s->kind = STMT_CONT;
-            s->loc = t.loc;
-            if (!parser_expect(p, TK_SEMI))
+            s->_while.cond = parse_expr(p);
+            if (!parser_expect(p, TK_CPAREN))
                 UNREACHABLE("parser_expect is currently nonreturnable");
-        } else if (token_equal(t, "return")) {
-            s->kind = STMT_RET;
+            s->_while.body = parse_stmt(p);
+        } else if (token_equal(t, "do")) {
+            s->kind = STMT_DO;
             s->loc = t.loc;
-            s->_return = parser_check(p, TK_SEMI) ? NULL : parse_expr(p);
-            if (!parser_expect(p, TK_SEMI))
-                UNREACHABLE("parser_expect is currently nonreturnable");
-        } else if (token_equal(t, "goto")) {
-            s->kind = STMT_GOTO;
-            s->loc = t.loc;
+            s->_while.body = parse_stmt(p);
             t = parser_peek(p);
-            if (!parser_expect(p, TK_IDENT))
+            if (!parser_expect(p, TK_KW) || !token_equal(t, "while"))
                 UNREACHABLE("parser_expect is currently nonreturnable");
-            s->goto_label = arena_strndup(p->a, t.start, t.len);
-            if (!parser_expect(p, TK_SEMI))
+            if (!parser_expect(p, TK_OPAREN))
+                UNREACHABLE("parser_expect is currently nonreturnable");
+            s->_while.cond = parse_expr(p);
+            if (!parser_expect(p, TK_CPAREN) || !parser_expect(p, TK_SEMI))
                 UNREACHABLE("parser_expect is currently nonreturnable");
         } else if (token_equal(t, "if")) {
             s->kind = STMT_IF;
@@ -802,15 +798,31 @@ Stmt *parse_stmt(Parser *p)
                 parser_bump(p);
                 s->_if._else = parse_stmt(p);
             }
-        } else if (token_equal(t, "while")) {
-            s->kind = STMT_WHILE;
+        } else if (token_equal(t, "break")) {
+            s->kind = STMT_BREAK;
             s->loc = t.loc;
-            if (!parser_expect(p, TK_OPAREN))
+            if (!parser_expect(p, TK_SEMI))
                 UNREACHABLE("parser_expect is currently nonreturnable");
-            s->_while.cond = parse_expr(p);
-            if (!parser_expect(p, TK_CPAREN))
+        } else if (token_equal(t, "continue")) {
+            s->kind = STMT_CONT;
+            s->loc = t.loc;
+            if (!parser_expect(p, TK_SEMI))
                 UNREACHABLE("parser_expect is currently nonreturnable");
-            s->_while.body = parse_stmt(p);
+        } else if (token_equal(t, "goto")) {
+            s->kind = STMT_GOTO;
+            s->loc = t.loc;
+            t = parser_peek(p);
+            if (!parser_expect(p, TK_IDENT))
+                UNREACHABLE("parser_expect is currently nonreturnable");
+            s->goto_label = arena_strndup(p->a, t.start, t.len);
+            if (!parser_expect(p, TK_SEMI))
+                UNREACHABLE("parser_expect is currently nonreturnable");
+        } else if (token_equal(t, "return")) {
+            s->kind = STMT_RET;
+            s->loc = t.loc;
+            s->_return = parser_check(p, TK_SEMI) ? NULL : parse_expr(p);
+            if (!parser_expect(p, TK_SEMI))
+                UNREACHABLE("parser_expect is currently nonreturnable");
         } else {
             TODO("implemenet the rest of statements that begin with keywords");
         }
