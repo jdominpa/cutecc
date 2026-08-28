@@ -830,6 +830,12 @@ Stmt *parse_stmt(Parser *p)
     }
     case TK_OBRACE:
         return parse_block_stmts(p);
+    case TK_SEMI: {
+        Stmt *s = arena_alloc(p->a, Stmt);
+        s->kind = STMT_EMPTY;
+        s->loc = t.loc;
+        return s;
+    }
     default:
         // TODO: use `diag_report_at` and try to recover from the error
         diag_fatal_at(t.loc, "invalid statement encountered");

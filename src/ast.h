@@ -185,6 +185,7 @@ struct Expr {
 //
 
 typedef enum {
+    STMT_EMPTY,    // ";"
     STMT_EXPR,     // expr-stmt
     STMT_BLOCK,    // "{" compound-stmt "}"
     STMT_LABEL,    // ident ":" stmt

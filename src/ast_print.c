@@ -368,6 +368,11 @@ static void print_stmt_ctx(PrintCtx *ctx, const Stmt *s)
     }
 
     switch (s->kind) {
+    case STMT_EMPTY:
+        fprintf(ctx->out, "(empty_stmt");
+        print_loc(ctx, s->loc);
+        fprintf(ctx->out, ")");
+        break;
     case STMT_BLOCK:
         fprintf(ctx->out, "(block");
         print_loc(ctx, s->loc);
