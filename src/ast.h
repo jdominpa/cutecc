@@ -208,7 +208,7 @@ struct Stmt {
     StmtKind kind;
     Loc loc;
     union {
-        Expr expr;
+        Expr *expr;
         struct {
             Stmt **stmts;
             size_t count;
@@ -220,17 +220,17 @@ struct Stmt {
         const char *goto_label;
         struct {
             Type type;
-            Expr var;
-            Expr value;
+            Expr *var;
+            Expr *value;
         } decl;
         struct {
             Expr *cond;
             Stmt *body;
         } _while;
         struct {
-            Expr init;
-            Expr cond;
-            Expr step;
+            Expr *init;
+            Expr *cond;
+            Expr *step;
             Stmt *body;
         } _for;
         struct {
@@ -239,11 +239,11 @@ struct Stmt {
             Stmt *_else;
         } _if;
         struct {
-            Expr ctrl;
+            Expr *ctrl;
             Stmt *body;
         } _switch;
         struct {
-            Expr name;
+            Expr *name;
             Stmt *body;
         } _case;
         Stmt *default_body;
