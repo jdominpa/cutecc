@@ -1,0 +1,4 @@
+(block <1:1>
+  statement 0: (empty_stmt <1:3>)
+  statement 1: (empty_stmt <1:4>)
+  statement 2: (empty_stmt <1:5>))

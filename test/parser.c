@@ -415,26 +415,13 @@ DEFINE_TEST(test_binop_assoc)
 }
 
 //
-// Jump statements
+// Empty statement
 //
 
-DEFINE_TEST(test_jump_statements)
+DEFINE_TEST(test_empty_statement)
 {
-    expect_stmt_from_file("break;", "test_break_stmt");
-    expect_stmt_from_file("continue;", "test_continue_stmt");
-    expect_stmt_from_file("goto a;", "test_goto_stmt");
-}
-
-//
-// Return statements
-//
-
-DEFINE_TEST(test_return_statements)
-{
-    expect_stmt_from_file("return;", "test_void_return_stmt");
-    expect_stmt_from_file("return 0;", "test_nonvoid_return_stmt");
-    expect_stmt_from_file("return a + b;", "test_return_expr_stmt");
-    expect_stmt_from_file("return f(x);", "test_return_call_stmt");
+    expect_stmt_from_file(";", "test_empty_stmt");
+    expect_stmt_from_file("{ ;;; }", "test_multiple_empty_stmt");
 }
 
 //
@@ -448,6 +435,29 @@ DEFINE_TEST(test_block_statements)
     expect_stmt_from_file("{ break; continue; }", "test_multi_block_stmt");
     expect_stmt_from_file("{ { break; } }", "test_nested_block_stmt");
     expect_stmt_from_file("{ if (a) break; return 0; }", "test_mixed_block_stmt");
+}
+
+//
+// While statement
+//
+
+DEFINE_TEST(test_while_statement)
+{
+    expect_stmt_from_file("while (a) break;", "test_while_stmt");
+    expect_stmt_from_file("while (a) { break; }", "test_while_block_stmt");
+    expect_stmt_from_file("while (a || b) break;",
+                          "test_while_complex_cond_stmt");
+}
+
+//
+// Do/while statement
+//
+
+DEFINE_TEST(test_do_statement)
+{
+    expect_stmt_from_file("do break; while (a);", "test_do_stmt");
+    expect_stmt_from_file("do { break; } while (a);", "test_do_block_stmt");
+    expect_stmt_from_file("do break; while (a && b);", "test_do_complex_cond_stmt");
 }
 
 //
@@ -475,19 +485,27 @@ DEFINE_TEST(test_if_statement_nesting)
                           "test_if_in_block_stmt");
 }
 
-DEFINE_TEST(test_while_statement)
+//
+// Jump statements
+//
+
+DEFINE_TEST(test_jump_statements)
 {
-    expect_stmt_from_file("while (a) break;", "test_while_stmt");
-    expect_stmt_from_file("while (a) { break; }", "test_while_block_stmt");
-    expect_stmt_from_file("while (a || b) break;",
-                          "test_while_complex_cond_stmt");
+    expect_stmt_from_file("break;", "test_break_stmt");
+    expect_stmt_from_file("continue;", "test_continue_stmt");
+    expect_stmt_from_file("goto a;", "test_goto_stmt");
 }
 
-DEFINE_TEST(test_do_statement)
+//
+// Return statements
+//
+
+DEFINE_TEST(test_return_statements)
 {
-    expect_stmt_from_file("do break; while (a);", "test_do_stmt");
-    expect_stmt_from_file("do { break; } while (a);", "test_do_block_stmt");
-    expect_stmt_from_file("do break; while (a && b);", "test_do_complex_cond_stmt");
+    expect_stmt_from_file("return;", "test_void_return_stmt");
+    expect_stmt_from_file("return 0;", "test_nonvoid_return_stmt");
+    expect_stmt_from_file("return a + b;", "test_return_expr_stmt");
+    expect_stmt_from_file("return f(x);", "test_return_call_stmt");
 }
 
 int main(void)
@@ -519,13 +537,15 @@ int main(void)
     RUN_TEST(test_alignof);
     RUN_TEST(test_parenthesized_expressions);
     RUN_TEST(test_binop_assoc);
-    RUN_TEST(test_jump_statements);
-    RUN_TEST(test_return_statements);
+    RUN_TEST(test_empty_statement);
+    RUN_TEST(test_expr_statement);
     RUN_TEST(test_block_statements);
-    RUN_TEST(test_if_statements);
-    RUN_TEST(test_if_statement_nesting);
     RUN_TEST(test_while_statement);
     RUN_TEST(test_do_statement);
+    RUN_TEST(test_if_statements);
+    RUN_TEST(test_if_statement_nesting);
+    RUN_TEST(test_jump_statements);
+    RUN_TEST(test_return_statements);
     TEST_SUMMARY();
     return 0;
 }
