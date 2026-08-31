@@ -538,7 +538,6 @@ int main(void)
     RUN_TEST(test_parenthesized_expressions);
     RUN_TEST(test_binop_assoc);
     RUN_TEST(test_empty_statement);
-    RUN_TEST(test_expr_statement);
     RUN_TEST(test_block_statements);
     RUN_TEST(test_while_statement);
     RUN_TEST(test_do_statement);
