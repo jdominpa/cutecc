@@ -43,6 +43,7 @@ static bool build_static_libsimpcc(Cmd *cmd)
         "io",
         "lexer",
         "parser",
+        "scope",
     };
     const char *obj_files[NOB_ARRAY_LEN(lib_files)];
     Nob_File_Paths headers = { 0 };
