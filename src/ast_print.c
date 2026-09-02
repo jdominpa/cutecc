@@ -260,11 +260,11 @@ static void print_expr_ctx(PrintCtx *ctx, const Expr *e)
         break;
     case EXPR_IDENT:
         if (ctx->compact) {
-            fprintf(ctx->out, "%s", e->ident);
+            fprintf(ctx->out, "%s", e->ident.name);
         } else {
             fprintf(ctx->out, "(ident");
             print_loc(ctx, e->loc);
-            fprintf(ctx->out, " %s)", e->ident);
+            fprintf(ctx->out, " %s)", e->ident.name);
         }
         break;
     case EXPR_UNOP:
@@ -293,7 +293,7 @@ static void print_expr_ctx(PrintCtx *ctx, const Expr *e)
     case EXPR_FN_CALL:
         fprintf(ctx->out, "(fn_call");
         print_loc(ctx, e->loc);
-        fprintf(ctx->out, " %s", e->fn_call.fn_name);
+        print_expr_field(ctx, "callee", e->fn_call.callee);
         for (size_t i = 0; i < e->fn_call.argc; ++i) {
             char arg_label[50];
             sprintf(arg_label, "arg %zu", i);

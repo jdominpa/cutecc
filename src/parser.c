@@ -486,7 +486,8 @@ static Expr *parse_expr_head(Parser *p)
         Expr *e = arena_alloc(p->a, Expr);
         e->kind = EXPR_IDENT;
         e->loc = t.loc;
-        e->ident = arena_strndup(p->a, t.start, t.len);
+        e->ident.name = arena_strndup(p->a, t.start, t.len);
+        e->ident.sym = NULL;
         return e;
     }
     case TK_KW:
@@ -662,10 +663,11 @@ static Expr *parse_expr_bp(Parser *p, uint8_t min_bp)
 
         // Function call
         if (parser_eat(p, TK_OPAREN)) {
-            if (e->kind != EXPR_IDENT)
-                diag_fatal_at(e->loc, "invalid identifier used as function name");
+            Expr *callee = e;
+            e = arena_alloc(p->a, Expr);
             e->kind = EXPR_FN_CALL;
-            e->fn_call.fn_name = e->ident;
+            e->loc = callee->loc;
+            e->fn_call.callee = callee;
             e->fn_call.args = parse_fn_call_args(p, &e->fn_call.argc);
             continue;
         }

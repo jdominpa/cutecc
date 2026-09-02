@@ -129,6 +129,9 @@ typedef enum {
     EXPR_COUNT,
 } ExprKind;
 
+// NOTE: `Symbol` is defined in scope.h which creates an inclusion cycle with
+// this file. Forward declare it here to be able to use it.
+typedef struct Symbol Symbol;
 typedef struct Expr Expr;
 struct Expr {
     ExprKind kind;
@@ -137,7 +140,10 @@ struct Expr {
         char c;
         const char *str;
         int val;
-        const char *ident;
+        struct {
+            const char *name;
+            Symbol *sym;
+        } ident;
         struct {
             UnopKind kind;
             Expr *operand;
@@ -153,7 +159,7 @@ struct Expr {
             Expr *_else;
         } ternop;
         struct {
-            const char *fn_name;
+            Expr *callee;
             size_t argc;
             Expr **args;
         } fn_call;
