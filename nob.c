@@ -93,6 +93,7 @@ defer:
 static const char *test_files[] = {
     "lexer",
     "parser",
+    "scope",
 };
 
 static bool build_tests(Cmd *cmd)
