@@ -828,6 +828,17 @@ Stmt *parse_stmt(Parser *p)
 // Translation unit parser
 //
 
+TranslUnit parse_transl_unit(Parser *p)
+{
+    TranslUnit _tl = { 0 };
+    print_stmt_compact(stdout, parse_stmt(p));
+    return _tl;
+}
+
+//
+// Parser initialization and freeing
+//
+
 Parser parser_init_from_lexer(Arena *a, Lexer l)
 {
     Parser p = { 0 };
@@ -859,9 +870,7 @@ inline Parser parser_init_from_file_path(Arena *a, const char *path)
     return parser_init_from_lexer(a, lexer_init_from_file_path(a, path));
 }
 
-TranslUnit parse_transl_unit(Parser *p)
+void parser_free(Parser *p)
 {
-    TranslUnit _tl = { 0 };
-    print_stmt_compact(stdout, parse_stmt(p));
-    return _tl;
+    scope_free(&p->sc);
 }

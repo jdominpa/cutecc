@@ -24,12 +24,13 @@ typedef struct {
     uint8_t right;
 } BindPower;
 
-Parser parser_init_from_lexer(Arena *a, Lexer l);
-Parser parser_init_from_src(Arena *a, const char *src);
-Parser parser_init_from_file_path(Arena *a, const char *path);
 Type parse_type(Parser *p);
 Expr *parse_expr(Parser *p);
 Stmt *parse_stmt(Parser *p);
 TranslUnit parse_transl_unit(Parser *p);
+Parser parser_init_from_lexer(Arena *a, Lexer l);
+Parser parser_init_from_src(Arena *a, const char *src);
+Parser parser_init_from_file_path(Arena *a, const char *path);
+void parser_free(Parser *p);
 
 #endif  // PARSER_H_

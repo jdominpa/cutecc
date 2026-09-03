@@ -43,10 +43,13 @@ static void expect_expr(const char *src, const char *expected)
     FILE *f = open_memstream(&got, &len);
     print_expr_compact(f, parse_expr(&p));
     fclose(f);
+
     EXPECT(len == strlen(expected) && strcmp(got, expected) == 0,
            "expected expression `%s` but got `%s`", expected, got);
     expect_input_consumed(&p, src);
+
     free(got);
+    parser_free(&p);
 }
 
 static void expect_stmt_from_file(const char *src, const char *file_name)
@@ -88,7 +91,9 @@ static void expect_stmt_from_file(const char *src, const char *file_name)
             }
         }
     }
+
     free(got);
+    parser_free(&p);
 }
 
 //

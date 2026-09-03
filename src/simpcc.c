@@ -102,8 +102,8 @@ int main(int argc, char **argv)
         // Compile to assembly
         // Link
 
+        parser_free(&p);
         arena_free(&ast_arena);
-        scope_free(&p.sc);
     }
 
     return 0;
