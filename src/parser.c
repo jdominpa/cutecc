@@ -98,8 +98,7 @@ static bool is_type(const Scope *sc, Token t)
         "const", "volatile", "restrict"
     };
     for (size_t i = 0; i < sizeof(types) / sizeof(*types); ++i)
-        if (token_equal(t, types[i]))
-            return true;
+        if (token_equal(t, types[i])) return true;
     return false;
 }
 
@@ -743,6 +742,23 @@ Stmt *parse_stmt(Parser *p)
     Token t = parser_peek(p);
     parser_bump(p);
     switch (t.kind) {
+    case TK_IDENT:
+        if (parser_eat(p, TK_COLON)) {
+            Stmt *s = arena_alloc(p->a, Stmt);
+            s->kind = STMT_LABEL;
+            s->loc = t.loc;
+            s->label.name = arena_strndup(p->a, t.start, t.len);
+            if (parser_check(p, TK_CBRACE)) {
+                Stmt *next = arena_alloc(p->a, Stmt);
+                next->kind = STMT_NULL;
+                next->loc = parser_peek(p).loc;
+                s->label.next = next;
+            } else {
+                s->label.next = parse_stmt(p);
+            }
+            /* s->label.next = parser_check(p, TK_CBRACE) ? NULL : parse_stmt(p); */
+            return s;
+        }
     case TK_KW: {
         Stmt *s = arena_alloc(p->a, Stmt);
         if (token_equal(t, "while")) {
@@ -814,13 +830,14 @@ Stmt *parse_stmt(Parser *p)
         return parse_block_stmts(p);
     case TK_SEMI: {
         Stmt *s = arena_alloc(p->a, Stmt);
-        s->kind = STMT_EMPTY;
+        s->kind = STMT_NULL;
         s->loc = t.loc;
         return s;
     }
     default:
         // TODO: use `diag_report_at` and try to recover from the error
-        diag_fatal_at(t.loc, "invalid statement encountered");
+        diag_fatal_at(t.loc, "invalid statement `%.*s` encountered",
+                      t.len, t.start);
     }
 }
 
@@ -831,7 +848,7 @@ Stmt *parse_stmt(Parser *p)
 TranslUnit parse_transl_unit(Parser *p)
 {
     TranslUnit _tl = { 0 };
-    print_stmt_compact(stdout, parse_stmt(p));
+    print_stmt(stdout, parse_stmt(p), 0);
     return _tl;
 }
 

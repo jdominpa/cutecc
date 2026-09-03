@@ -217,14 +217,14 @@ static void print_type_ctx(PrintCtx *ctx, const Type ty)
         fprintf(ctx->out, ")");
         break;
     default:
-        UNREACHABLE("print_type");
+        UNREACHABLE("print_type_ctx");
     }
 }
 
 static void print_expr_ctx(PrintCtx *ctx, const Expr *e)
 {
     if (e == NULL) {
-        fprintf(ctx->out, "(null_expr)");
+        fprintf(ctx->out, "(null_error)");
         return;
     }
 
@@ -356,20 +356,20 @@ static void print_expr_ctx(PrintCtx *ctx, const Expr *e)
         fprintf(ctx->out, ")");
         break;
     default:
-        UNREACHABLE("print_expr_as_sexp");
+        UNREACHABLE("print_expr_ctx");
     }
 }
 
 static void print_stmt_ctx(PrintCtx *ctx, const Stmt *s)
 {
     if (s == NULL) {
-        fprintf(ctx->out, "(null_stmt)");
+        fprintf(ctx->out, "(null_error)");
         return;
     }
 
     switch (s->kind) {
-    case STMT_EMPTY:
-        fprintf(ctx->out, "(empty_stmt");
+    case STMT_NULL:
+        fprintf(ctx->out, "(null_stmt");
         print_loc(ctx, s->loc);
         fprintf(ctx->out, ")");
         break;
@@ -381,6 +381,13 @@ static void print_stmt_ctx(PrintCtx *ctx, const Stmt *s)
             sprintf(stmt_label, "statement %zu", i);
             print_stmt_field(ctx, stmt_label, s->block.stmts[i]);
         }
+        fprintf(ctx->out, ")");
+        break;
+    case STMT_LABEL:
+        fprintf(ctx->out, "(label");
+        print_loc(ctx, s->loc);
+        fprintf(ctx->out, " %s", s->label.name);
+        print_stmt_field(ctx, "next_stmt", s->label.next);
         fprintf(ctx->out, ")");
         break;
     case STMT_WHILE:
@@ -430,7 +437,7 @@ static void print_stmt_ctx(PrintCtx *ctx, const Stmt *s)
         fprintf(ctx->out, ")");
         break;
     default:
-        UNREACHABLE("print_stmt");
+        UNREACHABLE("print_stmt_ctx");
     }
 }
 
