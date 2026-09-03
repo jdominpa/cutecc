@@ -439,6 +439,16 @@ DEFINE_TEST(test_block_statements)
 }
 
 //
+// Label statement
+//
+
+DEFINE_TEST(test_label_statements)
+{
+    expect_stmt_from_file("test_label: break;", "test_label_stmt");
+    expect_stmt_from_file("{ test_label: }", "test_null_stmt_after_label");
+}
+
+//
 // While statement
 //
 
@@ -540,6 +550,7 @@ int main(void)
     RUN_TEST(test_binop_assoc);
     RUN_TEST(test_empty_statement);
     RUN_TEST(test_block_statements);
+    RUN_TEST(test_label_statements);
     RUN_TEST(test_while_statement);
     RUN_TEST(test_do_statement);
     RUN_TEST(test_if_statements);
