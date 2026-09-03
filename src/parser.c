@@ -12,6 +12,7 @@
 #include "common.h"
 #include "diag.h"
 #include "lexer.h"
+#include "scope.h"
 
 // Returns the current token without consuming it.
 static inline Token parser_peek(Parser *p)
@@ -82,12 +83,14 @@ static inline bool token_equal(Token t, const char *str)
 // Type parser
 //
 
-static bool is_type(Token t)
+// Returns `true` if the current token in the parser `p` is a type.
+static bool is_type(const Scope *sc, Token t)
 {
-    if (t.kind == TK_IDENT)
-        TODO("named types not implemented yet");
-    else if (t.kind != TK_KW)
-        return false;
+    if (t.kind == TK_IDENT) {
+        Symbol *found = scope_lookup_var_n(sc, t.start, t.len);
+        return found != NULL && found->kind == SYMBOL_TYPEDEF;
+    }
+    if (t.kind != TK_KW) return false;
 
     const char *types[] = {
         "void", "bool", "_Bool", "char", "short", "int", "long",
@@ -98,24 +101,6 @@ static bool is_type(Token t)
         if (token_equal(t, types[i]))
             return true;
     return false;
-}
-
-static bool is_castable_type(Type ty)
-{
-    switch (ty.kind) {
-    case TYPE_VOID:
-    case TYPE_CHAR:
-    case TYPE_SHORT:
-    case TYPE_INT:
-    case TYPE_LONG:
-    case TYPE_FLOAT:
-    case TYPE_DOUBLE:
-    case TYPE_LDOUBLE:
-    case TYPE_PTR:
-        return true;
-    default:
-        return false;
-    }
 }
 
 // TODO: implement types TYPE_ENUM, TYPE_FUNC, TYPE_ARRAY, TYPE_VLA,
@@ -144,7 +129,7 @@ Type parse_type(Parser *p)
     uint32_t counter = 0;
     Token t = parser_peek(p);
     ty.loc = t.loc;
-    while (is_type(t)) {
+    while (is_type(&p->sc, t)) {
         if (token_equal(t, "void"))
             counter += VOID;
         else if (token_equal(t, "bool"))
@@ -166,88 +151,88 @@ Type parse_type(Parser *p)
         else if (token_equal(t, "unsigned"))
             counter |= UNSIGNED;
         else
-            UNREACHABLE("parse_type");
+            TODO("add support for missing type specifiers");
+
+        switch (counter) {
+        case VOID:
+            ty.kind = TYPE_VOID;
+            break;
+        case VOID + SIGNED:
+            diag_fatal_at(ty.loc, "type `void` is incompatible with type modifier `signed`");
+        case VOID + UNSIGNED:
+            diag_fatal_at(ty.loc, "type `void` is incompatible with type modifier `unsigned`");
+        case BOOL:
+            ty.kind = TYPE_BOOL;
+            break;
+        case BOOL + SIGNED:
+            diag_fatal_at(ty.loc, "type `bool` is incompatible with type modifier `unsigned`");
+        case BOOL + UNSIGNED:
+            diag_fatal_at(ty.loc, "type `bool` is incompatible with type modifier `unsigned`");
+        case CHAR:
+        case CHAR + SIGNED:
+            ty.kind = TYPE_CHAR;
+            ty.is_signed = true;
+            break;
+        case CHAR + UNSIGNED:
+            ty.kind = TYPE_CHAR;
+            ty.is_signed = false;
+            break;
+        case SHORT:
+        case SHORT + INT:
+        case SHORT + SIGNED:
+        case SHORT + INT + SIGNED:
+            ty.kind = TYPE_SHORT;
+            ty.is_signed = true;
+            break;
+        case SHORT + UNSIGNED:
+        case SHORT + INT + UNSIGNED:
+            ty.kind = TYPE_SHORT;
+            ty.is_signed = false;
+            break;
+        case INT:
+        case INT + SIGNED:
+        case SIGNED:
+            ty.kind = TYPE_INT;
+            ty.is_signed = true;
+            break;
+        case UNSIGNED:
+        case UNSIGNED + INT:
+            ty.kind = TYPE_INT;
+            ty.is_signed = false;
+            break;
+        case LONG:
+        case LONG + INT:
+        case LONG + LONG:
+        case LONG + LONG + INT:
+        case LONG + SIGNED:
+        case LONG + INT + SIGNED:
+        case LONG + LONG + SIGNED:
+        case LONG + LONG + INT + SIGNED:
+            ty.kind = TYPE_LONG;
+            ty.is_signed = true;
+            break;
+        case LONG + UNSIGNED:
+        case LONG + INT + UNSIGNED:
+        case LONG + LONG + UNSIGNED:
+        case LONG + LONG + INT + UNSIGNED:
+            ty.kind = TYPE_LONG;
+            ty.is_signed = false;
+            break;
+        case FLOAT:
+            ty.kind = TYPE_FLOAT;
+            break;
+        case DOUBLE:
+            ty.kind = TYPE_DOUBLE;
+            break;
+        case LONG + DOUBLE:
+            ty.kind = TYPE_LDOUBLE;
+            break;
+        default:
+            diag_fatal_at(ty.loc, "invalid type");
+        }
 
         parser_bump(p);
         t = parser_peek(p);
-    }
-
-    switch (counter) {
-    case VOID:
-        ty.kind = TYPE_VOID;
-        break;
-    case VOID + SIGNED:
-        diag_fatal_at(ty.loc, "type `void` is incompatible with type modifier `signed`");
-    case VOID + UNSIGNED:
-        diag_fatal_at(ty.loc, "type `void` is incompatible with type modifier `unsigned`");
-    case BOOL:
-        ty.kind = TYPE_BOOL;
-        break;
-    case BOOL + SIGNED:
-        diag_fatal_at(ty.loc, "type `bool` is incompatible with type modifier `unsigned`");
-    case BOOL + UNSIGNED:
-        diag_fatal_at(ty.loc, "type `bool` is incompatible with type modifier `unsigned`");
-    case CHAR:
-    case CHAR + SIGNED:
-        ty.kind = TYPE_CHAR;
-        ty.is_signed = true;
-        break;
-    case CHAR + UNSIGNED:
-        ty.kind = TYPE_CHAR;
-        ty.is_signed = false;
-        break;
-    case SHORT:
-    case SHORT + INT:
-    case SHORT + SIGNED:
-    case SHORT + INT + SIGNED:
-        ty.kind = TYPE_SHORT;
-        ty.is_signed = true;
-        break;
-    case SHORT + UNSIGNED:
-    case SHORT + INT + UNSIGNED:
-        ty.kind = TYPE_SHORT;
-        ty.is_signed = false;
-        break;
-    case INT:
-    case INT + SIGNED:
-    case SIGNED:
-        ty.kind = TYPE_INT;
-        ty.is_signed = true;
-        break;
-    case UNSIGNED:
-    case UNSIGNED + INT:
-        ty.kind = TYPE_INT;
-        ty.is_signed = false;
-        break;
-    case LONG:
-    case LONG + INT:
-    case LONG + LONG:
-    case LONG + LONG + INT:
-    case LONG + SIGNED:
-    case LONG + INT + SIGNED:
-    case LONG + LONG + SIGNED:
-    case LONG + LONG + INT + SIGNED:
-        ty.kind = TYPE_LONG;
-        ty.is_signed = true;
-        break;
-    case LONG + UNSIGNED:
-    case LONG + INT + UNSIGNED:
-    case LONG + LONG + UNSIGNED:
-    case LONG + LONG + INT + UNSIGNED:
-        ty.kind = TYPE_LONG;
-        ty.is_signed = false;
-        break;
-    case FLOAT:
-        ty.kind = TYPE_FLOAT;
-        break;
-    case DOUBLE:
-        ty.kind = TYPE_DOUBLE;
-        break;
-    case LONG + DOUBLE:
-        ty.kind = TYPE_LDOUBLE;
-        break;
-    default:
-        diag_fatal_at(ty.loc, "invalid type");
     }
 
     // Check for pointer suffixes
@@ -535,18 +520,13 @@ static Expr *parse_expr_head(Parser *p)
         return e;
     }
     case TK_OPAREN:
-        if (is_type(parser_peek(p))) {
+        if (is_type(&p->sc, parser_peek(p))) {
             // Cast
             // "(" Type ")" expr
             Expr *e = arena_alloc(p->a, Expr);
             e->kind = EXPR_CAST;
             e->loc = t.loc;
             e->cast.type = parse_type(p);
-            if (!is_castable_type(e->cast.type))
-                diag_fatal_at(e->cast.type.loc,
-                              "could not cast to type `%s`, only arithmetic "
-                              "and pointer types are castable",
-                              type_to_str(e->cast.type));
             if (!parser_expect(p, TK_CPAREN))
                 UNREACHABLE("parser_expect is currently nonreturnable");
             e->cast.expr = parse_expr_bp(p, get_prefix_op_bp());

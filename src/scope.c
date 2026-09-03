@@ -61,22 +61,40 @@ void scope_add_sym(Scope *sc, Symbol *sym)
 
 // Looks up a symbol `name` with namespace `ns`. Returns NULL if no such symbol
 // exists.
-static Symbol *scope_lookup_sym(Scope *sc, Namespace ns, const char *name)
+static Symbol *scope_lookup_sym(const Scope *sc, Namespace ns, const char *name, size_t len)
 {
-    for (size_t i = sc->count; i-- > 0;)
-        if (sc->items[i]->ns == ns &&
-            strcmp(sc->items[i]->name, name) == 0) return sc->items[i];
+    for (size_t i = sc->count; i-- > 0;) {
+        Symbol *sym = sc->items[i];
+        if (sym->ns == ns &&
+            strlen(sym->name) == len &&
+            strncmp(sym->name, name, len) == 0)
+            return sym;
+    }
     return NULL;
 }
 
-// Looks up a variable symbol `name` or returns NULL if no such symbol exists.
-Symbol *scope_lookup_var(Scope *sc, const char *name)
+// Looks up a variable symbol `name` of length `len` or returns NULL if no such
+// symbol exists.
+Symbol *scope_lookup_var_n(const Scope *sc, const char *name, size_t len)
 {
-    return scope_lookup_sym(sc, NS_VAR, name);
+    return scope_lookup_sym(sc, NS_VAR, name, len);
+}
+
+// Looks up a tag symbol `name` of length `len` or returns NULL if no such
+// symbol exists.
+Symbol *scope_lookup_tag_n(const Scope *sc, const char *name, size_t len)
+{
+    return scope_lookup_sym(sc, NS_TAG, name, len);
+}
+
+// Looks up a variable symbol `name` or returns NULL if no such symbol exists.
+Symbol *scope_lookup_var(const Scope *sc, const char *name)
+{
+    return scope_lookup_var_n(sc, name, strlen(name));
 }
 
 // Looks up a tag symbol `name` or returns NULL if no such symbol exists.
-Symbol *scope_lookup_tag(Scope *sc, const char *name)
+Symbol *scope_lookup_tag(const Scope *sc, const char *name)
 {
-    return scope_lookup_sym(sc, NS_TAG, name);
+    return scope_lookup_tag_n(sc, name, strlen(name));
 }

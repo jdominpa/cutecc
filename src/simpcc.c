@@ -6,6 +6,7 @@
 #include "common.h"
 #include "lexer.h"
 #include "parser.h"
+#include "scope.h"
 
 typedef struct {
     const char **items;
@@ -102,6 +103,7 @@ int main(int argc, char **argv)
         // Link
 
         arena_free(&ast_arena);
+        scope_free(&p.sc);
     }
 
     return 0;

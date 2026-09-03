@@ -7,12 +7,14 @@
 #include "arena.h"
 #include "ast.h"
 #include "lexer.h"
+#include "scope.h"
 
 typedef struct {
     Arena *a;
     Token *tokens;
     size_t token_count;
     size_t pos;
+    Scope sc;
     bool panic_mode;
     size_t err_count;
 } Parser;

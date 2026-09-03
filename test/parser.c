@@ -357,19 +357,15 @@ DEFINE_TEST(test_alignof)
 //
 // Parentheses
 //
-// TODO: only expressions whose first token is not an identifier can be
-// parenthesised today. parse_expr_head() calls is_type() on the token after
-// `(`, and is_type() hits a TODO() for identifiers, so `(a + b) * c` aborts.
-//
 
 DEFINE_TEST(test_parenthesized_expressions)
 {
-    expect_expr("((1))", "1");
-    expect_expr("(1 + 2) * 3", "(binop * (binop + 1 2) 3)");
-    expect_expr("1 * (2 + 3)", "(binop * 1 (binop + 2 3))");
-    expect_expr("(1 + 2) * (3 + 4)", "(binop * (binop + 1 2) (binop + 3 4))");
-    expect_expr("-(1 + 2)", "(unop - (binop + 1 2))");
-    expect_expr("f((1 + 2))", "(fn_call f (binop + 1 2))");
+    expect_expr("(a)", "a");
+    expect_expr("(a + b) * c", "(binop * (binop + a b) c)");
+    expect_expr("a * (b + c)", "(binop * a (binop + b c))");
+    expect_expr("(a + b) * (c + d)", "(binop * (binop + a b) (binop + c d))");
+    expect_expr("-(a + b)", "(unop - (binop + a b))");
+    expect_expr("f((a + b))", "(fn_call f (binop + a b))");
 }
 
 DEFINE_TEST(test_binop_assoc)
