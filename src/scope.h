@@ -38,6 +38,7 @@ typedef struct {
 
 void scope_enter(Scope *sc);
 void scope_exit(Scope *sc);
+void scope_free(Scope *sc);
 void scope_add_sym(Scope *sc, Symbol *sym);
 Symbol *scope_lookup_var(Scope *sc, const char *name);
 Symbol *scope_lookup_tag(Scope *sc, const char *name);

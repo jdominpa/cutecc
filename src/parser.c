@@ -881,7 +881,7 @@ inline Parser parser_init_from_file_path(Arena *a, const char *path)
 
 TranslUnit parse_transl_unit(Parser *p)
 {
-    TranslUnit _tl;
+    TranslUnit _tl = { 0 };
     print_stmt_compact(stdout, parse_stmt(p));
     return _tl;
 }

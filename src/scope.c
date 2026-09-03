@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "common.h"
@@ -21,6 +22,18 @@ void scope_exit(Scope *sc)
            sc->items[sc->count - 1]->depth == sc->depth)
         sc->count--;
     sc->depth--;
+}
+
+// Releases the symbol table of `sc` and leaves it in the same state as a
+// zero-initialised scope. The symbols themselves are owned by the arena they
+// were allocated from and are not freed here.
+void scope_free(Scope *sc)
+{
+    free(sc->items);
+    sc->items = NULL;
+    sc->count = 0;
+    sc->capacity = 0;
+    sc->depth = 0;
 }
 
 // Adds the symbol `sym` to the scope `sc`. The depth of `sym` gets set to the
